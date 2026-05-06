@@ -1,0 +1,16 @@
+{
+  "name": "trademark-dashboard",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-simple-maps": "latest",
+    "d3-fetch": "latest"
+  }
+}
