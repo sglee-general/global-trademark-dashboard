@@ -3,7 +3,7 @@ import { csv } from "d3-fetch";
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 
 // ⚠️ 여기에 본인의 구글 시트 웹 게시(CSV) URL을 꼭 넣으세요!
-const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTv9Nf_RdMQwHDRRk1L1PrL6LsBV1hfhjUsZ9MhIV1LPWLOAmmb8BwI-eIavV01nrJORaE0U5Tv4g_b/pub?output=csv";
+const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTv9Nf_RdMQwHDRRk1L1PrL6LsBV1hfhjUsZ9MhIV1LPWLOAmmb8BwI-eIavV01nrJORaE0U5Tv4g_b/pub?gid=916788690&single=true&output=csv";
 const geoUrl = "https://raw.githubusercontent.com/lotusms/world-map-data/main/world-110m.json";
 
 const colorMap = {
