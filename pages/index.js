@@ -2,36 +2,27 @@ import React, { useEffect, useState } from "react";
 import { csv } from "d3-fetch";
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 
+// 1. 데이터 소스 (사용자님의 구글 시트 CSV)
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTv9Nf_RdMQwHDRRk1L1PrL6LsBV1hfhjUsZ9MhIV1LPWLOAmmb8BwI-eIavV01nrJORaE0U5Tv4g_b/pub?gid=916788690&single=true&output=csv";
-
-// 가장 표준적인 세계 지도 데이터 (ISO_A3 코드가 확실히 포함됨)
 const geoUrl = "https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson";
 
+// 2. 상태별 색상 (비나우 브랜드 가이드에 맞춘 깔끔한 톤)
 const colorMap = {
-  Green: "#2ecc71",
-  Blue: "#3498db",
-  Yellow: "#f1c40f",
-  Red: "#e74c3c",
-  Grey: "#dcdde1"
+  Green: "#27ae60",  // 등록 완료
+  Blue: "#3498db",   // 출원 중
+  Yellow: "#f1c40f", // 이의신청/거절이유
+  Red: "#e74c3c",    // 거절/분쟁
+  Grey: "#dfe4ea"    // 미출원/정보없음
 };
 
-export default function Dashboard() {
+export default function BenowDashboard() {
   const [data, setData] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState("All");
-  const [tooltip, setTooltip] = useState("");
-  const [debugInfo, setDebugInfo] = useState("데이터 로딩 중...");
+  const [selectedInfo, setSelectedInfo] = useState(null); // 클릭한 국가 정보
 
   useEffect(() => {
     csv(SHEET_URL).then((rows) => {
-      if (rows && rows.length > 0) {
-        console.log("실제 감지된 컬럼명들:", Object.keys(rows[0]));
-        setData(rows);
-        setDebugInfo(`데이터 로드 성공! 총 ${rows.length}행 발견.`);
-      } else {
-        setDebugInfo("데이터를 가져왔으나 내용이 비어있습니다.");
-      }
-    }).catch(err => {
-      setDebugInfo("데이터 로드 실패: " + err.message);
+      setData(rows);
     });
   }, []);
 
@@ -39,65 +30,65 @@ export default function Dashboard() {
   const filteredData = selectedBrand === "All" ? data : data.filter((d) => d.Brand === selectedBrand);
 
   return (
-    <div style={{ fontFamily: "sans-serif", padding: "20px", maxWidth: "1200px", margin: "0 auto" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-        <h1 style={{ fontSize: "24px", color: "#2c3e50" }}>🌍 Global Trademark Dashboard</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <strong>Brand:</strong>
+    <div style={{ minHeight: "100vh", background: "#f1f2f6", padding: "30px", fontFamily: "'Pretendard', sans-serif" }}>
+      
+      {/* 상단 헤더 영역 */}
+      <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+        <h1 style={{ fontSize: "26px", color: "#2f3542", fontWeight: "bold", margin: 0 }}>
+          비나우 글로벌 상표권 현황
+        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "#fff", padding: "8px 15px", borderRadius: "12px", boxShadow: "0 2px 5px rgba(0,0,0,0.05)" }}>
+          <span style={{ fontSize: "14px", fontWeight: "bold", color: "#57606f" }}>브랜드 필터</span>
           <select 
             onChange={(e) => setSelectedBrand(e.target.value)} 
-            style={{ padding: "8px", borderRadius: "8px", border: "1px solid #ddd" }}
+            style={{ border: "none", outline: "none", fontSize: "14px", cursor: "pointer", fontWeight: "500" }}
           >
             {brands.map((b) => <option key={b} value={b}>{b}</option>)}
           </select>
         </div>
-      </header>
-      
-      {/* 상태 확인용 (나중에 지우셔도 됩니다) */}
-      <div style={{ fontSize: "12px", color: "#999", marginBottom: "10px" }}>{debugInfo}</div>
+      </div>
 
-      <div style={{ background: "#fff", border: "1px solid #eee", borderRadius: "20px", overflow: "hidden", position: "relative", minHeight: "500px" }}>
-        <ComposableMap projectionConfig={{ scale: 140 }}>
-          <ZoomableGroup center={[20, 10]}>
+      {/* 지도 영역 */}
+      <div style={{ 
+        maxWidth: "1100px", margin: "0 auto", background: "#fff", borderRadius: "24px", 
+        boxShadow: "0 10px 30px rgba(0,0,0,0.1)", position: "relative", overflow: "hidden", border: "1px solid #eee"
+      }}>
+        <ComposableMap 
+          projectionConfig={{ scale: 145 }} 
+          style={{ width: "100%", height: "600px" }}
+        >
+          {/* ZoomableGroup에서 무분별한 휠 확대를 방지하고 드래그를 최적화함 */}
+          <ZoomableGroup 
+            maxZoom={5} 
+            minZoom={1}
+            translateExtent={[[0, 0], [800, 600]]} // 지도 이탈 방지
+          >
             <Geographies geography={geoUrl}>
               {({ geographies }) =>
                 geographies.map((geo) => {
-                  // 지도 데이터에서 국가 코드 추출
-                  const countryISO = (geo.properties.ISO_A3 || geo.properties.iso_a3 || "").trim().toUpperCase();
+                  const countryISO = (geo.properties.ISO_A3 || geo.properties.iso_a3 || "").toUpperCase();
                   const countryName = geo.properties.ADMIN || geo.properties.name;
 
-                  // 💡 핵심: 어떤 컬럼명이든 "ISO3"나 "CountryCode"가 포함된 것을 찾아 매칭
-                  const info = filteredData.find((d) => {
-                    // 모든 컬럼을 뒤져서 'KOR', 'USA' 같은 코드가 있는지 확인
-                    return Object.entries(d).some(([key, value]) => {
-                      const isTargetColumn = key.includes("ISO3") || key.includes("CountryCode");
-                      return isTargetColumn && value && value.trim().toUpperCase() === countryISO;
-                    });
-                  });
+                  // 데이터 매칭
+                  const info = filteredData.find((d) => 
+                    d["CountryCode (ISO3)"] && d["CountryCode (ISO3)"].trim().toUpperCase() === countryISO
+                  );
 
-                  // 상태(Status) 값도 대소문자 무관하게 매칭
-                  let fillColor = colorMap.Grey;
-                  if (info && info.Status) {
-                    const statusKey = info.Status.trim();
-                    fillColor = colorMap[statusKey] || colorMap.Grey;
-                  }
+                  const status = info ? info.Status.trim() : "Grey";
+                  const fillColor = colorMap[status] || colorMap.Grey;
 
                   return (
                     <Geography
                       key={geo.rsmKey}
                       geography={geo}
-                      onMouseEnter={() => {
-                        if (info) {
-                          setTooltip(`${countryName}: [${info.class || '류 미지정'}] ${info.Status} - ${info.Details || ''}`);
-                        } else {
-                          setTooltip(`${countryName}: 등록 데이터 없음`);
-                        }
+                      onClick={() => {
+                        // 클릭 시 모달 데이터 세팅
+                        setSelectedInfo(info ? { ...info, countryName } : { countryName, Status: "정보 없음", empty: true });
                       }}
-                      onMouseLeave={() => setTooltip("")}
                       style={{
                         default: { fill: fillColor, outline: "none", stroke: "#fff", strokeWidth: 0.5 },
-                        hover: { fill: "#95a5a6", cursor: "pointer", outline: "none" },
-                        pressed: { fill: "#7f8c8d", outline: "none" }
+                        hover: { fill: "#ced4da", cursor: "pointer", outline: "none" },
+                        pressed: { fill: "#adb5bd", outline: "none" }
                       }}
                     />
                   );
@@ -106,23 +97,50 @@ export default function Dashboard() {
             </Geographies>
           </ZoomableGroup>
         </ComposableMap>
-        
-        {tooltip && (
+
+        {/* 클릭 시 상세 정보 모달 (화면 중앙 하단 배정) */}
+        {selectedInfo && (
           <div style={{
-            position: "absolute", bottom: "20px", left: "20px", right: "20px",
-            background: "rgba(0,0,0,0.8)", color: "#fff", padding: "12px",
-            borderRadius: "10px", fontSize: "14px", textAlign: "center", pointerEvents: "none", zIndex: 10
+            position: "absolute", bottom: "30px", left: "50%", transform: "translateX(-50%)",
+            width: "320px", background: "#fff", padding: "20px", borderRadius: "18px",
+            boxShadow: "0 15px 40px rgba(0,0,0,0.2)", border: "1px solid #38bdf8", zIndex: 100
           }}>
-            {tooltip}
+            <button 
+              onClick={() => setSelectedInfo(null)}
+              style={{ position: "absolute", top: "12px", right: "12px", border: "none", background: "none", cursor: "pointer", fontSize: "16px", color: "#999" }}
+            >
+              ✕
+            </button>
+            <h3 style={{ margin: "0 0 12px", color: "#2f3542", borderBottom: "2px solid #38bdf8", paddingBottom: "5px", display: "inline-block" }}>
+              {selectedInfo.countryName}
+            </h3>
+            {selectedInfo.empty ? (
+              <p style={{ fontSize: "14px", color: "#747d8c", margin: "10px 0" }}>상표권 등록 데이터가 없습니다.</p>
+            ) : (
+              <div style={{ fontSize: "14px", color: "#2f3542", lineHeight: "1.8" }}>
+                <div><strong>브랜드:</strong> {selectedInfo.Brand}</div>
+                <div><strong>현재 상태:</strong> <span style={{ color: colorMap[selectedInfo.Status.trim()], fontWeight: "bold" }}>{selectedInfo.Status}</span></div>
+                <div><strong>상품류:</strong> {selectedInfo.class}류 ({selectedInfo.TYPE})</div>
+                <div style={{ 
+                  marginTop: "10px", padding: "10px", background: "#f1f2f6", borderRadius: "8px", 
+                  fontSize: "13px", color: "#57606f", borderLeft: "4px solid #38bdf8" 
+                }}>
+                  {selectedInfo.Details}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      <div style={{ marginTop: "20px", display: "flex", gap: "20px", justifyContent: "center" }}>
+      {/* 하단 범례 */}
+      <div style={{ marginTop: "30px", display: "flex", gap: "25px", justifyContent: "center" }}>
         {Object.entries(colorMap).map(([label, color]) => (
-          <div key={label} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{ width: "14px", height: "14px", background: color, borderRadius: "3px" }}></div>
-            <span style={{ fontSize: "13px", color: "#666" }}>{label}</span>
+          <div key={label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ width: "14px", height: "14px", background: color, borderRadius: "4px" }}></div>
+            <span style={{ fontSize: "13px", color: "#57606f", fontWeight: "500" }}>
+              {label === "Grey" ? "미출원/정보없음" : label}
+            </span>
           </div>
         ))}
       </div>
