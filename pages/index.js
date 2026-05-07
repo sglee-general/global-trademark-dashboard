@@ -19,11 +19,11 @@ export default function Home() {
   const [selectedBrand, setSelectedBrand] =
     useState("");
 
-  const [tooltip, setTooltip] =
+  const [selectedCountry, setSelectedCountry] =
     useState(null);
 
   const [position, setPosition] = useState({
-    coordinates: [0, 20],
+    coordinates: [10, 15],
     zoom: 1
   });
 
@@ -80,9 +80,6 @@ export default function Home() {
     );
   }, [data, selectedBrand]);
 
-  /**
-   * 국가별 데이터 집계
-   */
   const getCountryData = (iso3) => {
     const rows = filteredData.filter(
       (item) => item.CODE === iso3
@@ -94,11 +91,6 @@ export default function Home() {
     const statuses = rows.map((r) =>
       r.STATUS.toLowerCase()
     );
-
-    /**
-     * 실무형 우선순위
-     * green > blue > yellow > red
-     */
 
     let finalStatus = "red";
 
@@ -125,8 +117,10 @@ export default function Home() {
     return {
       COUNTRY:
         rows[0].COUNTRY,
+
       BRAND:
         selectedBrand,
+
       STATUS:
         finalStatus,
 
@@ -153,12 +147,7 @@ export default function Home() {
       TOTAL_COUNT:
         rows.length,
 
-      DETAILS: rows
-        .map(
-          (r) =>
-            `${r.CLASS} / ${r.TYPE} / ${r.DETAILS}`
-        )
-        .join("\n")
+      ROWS: rows
     };
   };
 
@@ -274,294 +263,319 @@ export default function Home() {
 
       <div
         style={{
-          background:
-            "white",
-          borderRadius:
-            "24px",
-          padding: "20px",
-          boxShadow:
-            "0 4px 24px rgba(0,0,0,0.08)",
-          position:
-            "relative",
-          overflow:
-            "hidden"
+          display: "flex",
+          gap: "20px"
         }}
       >
-        {tooltip && (
+        <div
+          style={{
+            flex: 1,
+            background:
+              "white",
+            borderRadius:
+              "24px",
+            padding: "10px",
+            boxShadow:
+              "0 4px 24px rgba(0,0,0,0.08)"
+          }}
+        >
+          <ComposableMap
+            projectionConfig={{
+              scale: 135
+            }}
+            style={{
+              width: "100%",
+              height: "75vh"
+            }}
+          >
+            <ZoomableGroup
+              zoom={
+                position.zoom
+              }
+              center={
+                position.coordinates
+              }
+              onMoveEnd={(pos) =>
+                setPosition(pos)
+              }
+            >
+              <Geographies geography={geoUrl}>
+                {({
+                  geographies
+                }) =>
+                  geographies
+                    .filter(
+                      (geo) =>
+                        ![
+                          "ATA"
+                        ].includes(
+                          geo.id
+                        )
+                    )
+                    .map(
+                      (geo) => {
+                        const iso3 =
+                          geo.id;
+
+                        const countryData =
+                          getCountryData(
+                            iso3
+                          );
+
+                        return (
+                          <Geography
+                            key={
+                              geo.rsmKey
+                            }
+                            geography={
+                              geo
+                            }
+                            fill={getColor(
+                              countryData
+                            )}
+                            stroke="#FFFFFF"
+                            strokeWidth={
+                              0.5
+                            }
+                            style={{
+                              default:
+                                {
+                                  outline:
+                                    "none"
+                                },
+                              hover:
+                                {
+                                  fill:
+                                    "#111827",
+                                  outline:
+                                    "none",
+                                  cursor:
+                                    "pointer"
+                                },
+                              pressed:
+                                {
+                                  outline:
+                                    "none"
+                                }
+                            }}
+                            onClick={() =>
+                              setSelectedCountry(
+                                {
+                                  geo,
+                                  data:
+                                    countryData
+                                }
+                              )
+                            }
+                          />
+                        );
+                      }
+                    )
+                }
+              </Geographies>
+            </ZoomableGroup>
+          </ComposableMap>
+        </div>
+
+        {selectedCountry && (
           <div
             style={{
-              position:
-                "fixed",
-              top:
-                tooltip.y +
-                12,
-              left:
-                tooltip.x +
-                12,
+              width: "380px",
               background:
                 "white",
-              padding:
-                "16px",
               borderRadius:
-                "14px",
+                "24px",
+              padding: "20px",
               boxShadow:
-                "0 8px 24px rgba(0,0,0,0.15)",
-              zIndex: 999,
-              width:
-                "340px",
-              pointerEvents:
-                "none",
-              fontSize: "14px"
+                "0 4px 24px rgba(0,0,0,0.08)",
+              height: "75vh",
+              overflow:
+                "hidden",
+              display: "flex",
+              flexDirection:
+                "column"
             }}
           >
             <div
               style={{
+                display: "flex",
+                justifyContent:
+                  "space-between",
+                alignItems:
+                  "center",
                 marginBottom:
-                  "8px"
+                  "16px"
               }}
             >
-              <strong>
-                국가:
-              </strong>{" "}
-              {
-                tooltip.country
-              }
+              <h2
+                style={{
+                  margin: 0
+                }}
+              >
+                {
+                  selectedCountry
+                    .data
+                    ?.COUNTRY
+                }
+              </h2>
+
+              <button
+                onClick={() =>
+                  setSelectedCountry(
+                    null
+                  )
+                }
+                style={{
+                  border: "none",
+                  background:
+                    "#E2E8F0",
+                  borderRadius:
+                    "8px",
+                  padding:
+                    "6px 10px",
+                  cursor:
+                    "pointer"
+                }}
+              >
+                ✕
+              </button>
             </div>
 
-            <div
-              style={{
-                marginBottom:
-                  "8px"
-              }}
-            >
-              <strong>
-                브랜드:
-              </strong>{" "}
-              {
-                tooltip.brand
-              }
-            </div>
+            {selectedCountry
+              .data ? (
+              <>
+                <div
+                  style={{
+                    marginBottom:
+                      "12px"
+                  }}
+                >
+                  현재 상태:
+                  {" "}
+                  <strong>
+                    {getStatusLabel(
+                      selectedCountry
+                        .data
+                        .STATUS
+                    )}
+                  </strong>
+                </div>
 
-            <div
-              style={{
-                marginBottom:
-                  "8px"
-              }}
-            >
-              <strong>
-                현재 상태:
-              </strong>{" "}
-              {
-                tooltip.status
-              }
-            </div>
+                <div
+                  style={{
+                    marginBottom:
+                      "16px",
+                    lineHeight:
+                      1.8
+                  }}
+                >
+                  🟩 등록:
+                  {" "}
+                  {
+                    selectedCountry
+                      .data
+                      .GREEN_COUNT
+                  }
+                  건
+                  <br />
+                  🟦 출원:
+                  {" "}
+                  {
+                    selectedCountry
+                      .data
+                      .BLUE_COUNT
+                  }
+                  건
+                  <br />
+                  🟨 이의:
+                  {" "}
+                  {
+                    selectedCountry
+                      .data
+                      .YELLOW_COUNT
+                  }
+                  건
+                  <br />
+                  🟥 거절:
+                  {" "}
+                  {
+                    selectedCountry
+                      .data
+                      .RED_COUNT
+                  }
+                  건
+                </div>
 
-            <div
-              style={{
-                marginBottom:
-                  "8px"
-              }}
-            >
-              🟩 등록:
-              {" "}
-              {
-                tooltip.green
-              }
-              건
-            </div>
-
-            <div
-              style={{
-                marginBottom:
-                  "8px"
-              }}
-            >
-              🟦 출원:
-              {" "}
-              {
-                tooltip.blue
-              }
-              건
-            </div>
-
-            <div
-              style={{
-                marginBottom:
-                  "8px"
-              }}
-            >
-              🟨 이의:
-              {" "}
-              {
-                tooltip.yellow
-              }
-              건
-            </div>
-
-            <div
-              style={{
-                marginBottom:
-                  "8px"
-              }}
-            >
-              🟥 거절:
-              {" "}
-              {
-                tooltip.red
-              }
-              건
-            </div>
-
-            <hr />
-
-            <div
-              style={{
-                whiteSpace:
-                  "pre-line",
-                maxHeight:
-                  "160px",
-                overflow:
-                  "auto",
-                marginTop:
-                  "10px"
-              }}
-            >
-              {
-                tooltip.details
-              }
-            </div>
-          </div>
-        )}
-
-        <ComposableMap
-          projectionConfig={{
-            scale: 160
-          }}
-          style={{
-            width: "100%",
-            height: "auto"
-          }}
-        >
-          <ZoomableGroup
-            zoom={
-              position.zoom
-            }
-            center={
-              position.coordinates
-            }
-            onMoveEnd={(pos) =>
-              setPosition(pos)
-            }
-          >
-            <Geographies geography={geoUrl}>
-              {({
-                geographies
-              }) =>
-                geographies.map(
-                  (geo) => {
-                    const iso3 =
-                      geo.id;
-
-                    const countryData =
-                      getCountryData(
-                        iso3
-                      );
-
-                    return (
-                      <Geography
+                <div
+                  style={{
+                    flex: 1,
+                    overflowY:
+                      "auto",
+                    borderTop:
+                      "1px solid #E2E8F0",
+                    paddingTop:
+                      "12px"
+                  }}
+                >
+                  {selectedCountry.data.ROWS.map(
+                    (
+                      row,
+                      idx
+                    ) => (
+                      <div
                         key={
-                          geo.rsmKey
-                        }
-                        geography={
-                          geo
-                        }
-                        fill={getColor(
-                          countryData
-                        )}
-                        stroke="#FFFFFF"
-                        strokeWidth={
-                          0.6
+                          idx
                         }
                         style={{
-                          default:
-                            {
-                              outline:
-                                "none"
-                            },
-                          hover: {
-                            fill:
-                              "#111827",
-                            outline:
-                              "none",
-                            cursor:
-                              "pointer"
-                          },
-                          pressed:
-                            {
-                              outline:
-                                "none"
-                            }
+                          padding:
+                            "10px",
+                          borderRadius:
+                            "12px",
+                          background:
+                            "#F8FAFC",
+                          marginBottom:
+                            "10px"
                         }}
-                        onMouseEnter={(
-                          evt
-                        ) => {
-                          setTooltip(
+                      >
+                        <div>
+                          <strong>
                             {
-                              x:
-                                evt.clientX,
-                              y:
-                                evt.clientY,
-
-                              country:
-                                countryData?.COUNTRY ||
-                                geo
-                                  .properties
-                                  .name,
-
-                              brand:
-                                countryData?.BRAND ||
-                                "-",
-
-                              status:
-                                getStatusLabel(
-                                  countryData?.STATUS
-                                ),
-
-                              green:
-                                countryData?.GREEN_COUNT ||
-                                0,
-
-                              blue:
-                                countryData?.BLUE_COUNT ||
-                                0,
-
-                              yellow:
-                                countryData?.YELLOW_COUNT ||
-                                0,
-
-                              red:
-                                countryData?.RED_COUNT ||
-                                0,
-
-                              details:
-                                countryData?.DETAILS ||
-                                "-"
+                              row.CLASS
                             }
-                          );
-                        }}
-                        onMouseLeave={() =>
-                          setTooltip(
-                            null
-                          )
-                        }
-                      />
-                    );
-                  }
-                )
-              }
-            </Geographies>
-          </ZoomableGroup>
-        </ComposableMap>
+                          </strong>
+                        </div>
+
+                        <div>
+                          {
+                            row.TYPE
+                          }
+                        </div>
+
+                        <div>
+                          {
+                            row.DETAILS
+                          }
+                        </div>
+
+                        <div>
+                          상태:
+                          {" "}
+                          {
+                            row.STATUS
+                          }
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              </>
+            ) : (
+              <div>
+                정보 없음
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
