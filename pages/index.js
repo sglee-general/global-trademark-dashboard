@@ -35,16 +35,20 @@ export default function Home() {
       complete: (results) => {
         const cleaned = results.data.map(
           (item) => ({
-            COUNTRY:
-              item.COUNTRY?.trim() ||
-              item["국가명"]?.trim() ||
-              "",
-            CODE:
-              item.CODE?.trim() || "",
             BRAND:
               item.BRAND?.trim() || "",
+            COUNTRY:
+              item.COUNTRY?.trim() || "",
+            CODE:
+              item.CODE?.trim() || "",
+            CLASS:
+              item.CLASS?.trim() || "",
+            TYPE:
+              item.TYPE?.trim() || "",
             STATUS:
-              item.STATUS?.trim() || ""
+              item.STATUS?.trim() || "",
+            DETAILS:
+              item.DETAILS?.trim() || ""
           })
         );
 
@@ -77,73 +81,110 @@ export default function Home() {
   }, [data, selectedBrand]);
 
   /**
-   * 국가별 데이터 집계
+   * 국가별 여러 건 집계
    */
   const getCountryData = (iso3) => {
     const rows = filteredData.filter(
       (item) => item.CODE === iso3
     );
 
-    if (rows.length === 0) return null;
+    if (rows.length === 0)
+      return null;
 
-    const statuses = rows.map(
-      (r) => r.STATUS || ""
+    const statuses = rows.map((r) =>
+      r.STATUS.toLowerCase()
     );
 
-    let finalStatus = "등록";
+    let finalStatus = "green";
 
+    /**
+     * 우선순위:
+     * red > yellow > blue > green
+     */
     if (
-      statuses.some(
-        (s) =>
-          s.includes("거절") ||
-          s.includes("분쟁")
+      statuses.some((s) =>
+        s.includes("red")
       )
     ) {
-      finalStatus = "거절/분쟁";
+      finalStatus = "red";
     } else if (
       statuses.some((s) =>
-        s.includes("이의")
+        s.includes("yellow")
       )
     ) {
-      finalStatus = "이의신청";
+      finalStatus = "yellow";
     } else if (
       statuses.some((s) =>
-        s.includes("출원")
+        s.includes("blue")
       )
     ) {
-      finalStatus = "출원";
+      finalStatus = "blue";
     }
 
     return {
       COUNTRY:
-        rows[0].COUNTRY || "",
-      BRAND: selectedBrand,
-      STATUS: finalStatus,
+        rows[0].COUNTRY,
+      BRAND:
+        selectedBrand,
+      STATUS:
+        finalStatus,
+      DETAILS: rows
+        .map((r) => r.DETAILS)
+        .filter(Boolean)
+        .join(", "),
       COUNT: rows.length
     };
   };
 
+  /**
+   * 지도 색상
+   */
   const getColor = (country) => {
-    if (!country) return "#D1D5DB";
+    if (!country)
+      return "#D1D5DB";
 
-    const status = country.STATUS;
+    switch (
+      country.STATUS
+    ) {
+      case "green":
+        return "#22C55E";
 
-    if (status.includes("등록"))
-      return "#22C55E";
+      case "blue":
+        return "#3B82F6";
 
-    if (status.includes("출원"))
-      return "#3B82F6";
+      case "red":
+        return "#EF4444";
 
-    if (
-      status.includes("거절") ||
-      status.includes("분쟁")
-    )
-      return "#EF4444";
+      case "yellow":
+        return "#FACC15";
 
-    if (status.includes("이의"))
-      return "#FACC15";
+      default:
+        return "#9CA3AF";
+    }
+  };
 
-    return "#9CA3AF";
+  /**
+   * 상태 텍스트
+   */
+  const getStatusLabel = (
+    status
+  ) => {
+    switch (status) {
+      case "green":
+        return "등록 완료";
+
+      case "blue":
+        return "출원 진행";
+
+      case "red":
+        return "거절/분쟁";
+
+      case "yellow":
+        return "이의신청";
+
+      default:
+        return "정보 없음";
+    }
   };
 
   return (
@@ -151,7 +192,8 @@ export default function Home() {
       style={{
         fontFamily:
           "Pretendard, Malgun Gothic, sans-serif",
-        background: "#F8FAFC",
+        background:
+          "#F8FAFC",
         minHeight: "100vh",
         padding: "20px"
       }}
@@ -160,7 +202,8 @@ export default function Home() {
         style={{
           fontSize: "34px",
           fontWeight: "700",
-          marginBottom: "20px"
+          marginBottom:
+            "20px"
         }}
       >
         비나우 글로벌 상표권 등록 현황
@@ -168,94 +211,151 @@ export default function Home() {
 
       <div
         style={{
-          marginBottom: "20px"
+          marginBottom:
+            "20px"
         }}
       >
         <select
-          value={selectedBrand}
+          value={
+            selectedBrand
+          }
           onChange={(e) =>
             setSelectedBrand(
               e.target.value
             )
           }
           style={{
-            padding: "12px 16px",
-            borderRadius: "12px",
+            padding:
+              "12px 16px",
+            borderRadius:
+              "12px",
             border:
               "1px solid #CBD5E1",
-            background: "white",
-            fontSize: "16px",
-            minWidth: "240px"
+            background:
+              "white",
+            fontSize:
+              "16px",
+            minWidth:
+              "240px"
           }}
         >
-          {brands.map((brand) => (
-            <option
-              key={brand}
-              value={brand}
-            >
-              {brand}
-            </option>
-          ))}
+          {brands.map(
+            (brand) => (
+              <option
+                key={brand}
+                value={brand}
+              >
+                {brand}
+              </option>
+            )
+          )}
         </select>
       </div>
 
       <div
         style={{
-          background: "white",
-          borderRadius: "24px",
+          background:
+            "white",
+          borderRadius:
+            "24px",
           padding: "20px",
           boxShadow:
             "0 4px 24px rgba(0,0,0,0.08)",
-          position: "relative",
-          overflow: "hidden"
+          position:
+            "relative",
+          overflow:
+            "hidden"
         }}
       >
         {tooltip && (
           <div
             style={{
-              position: "fixed",
-              top: tooltip.y + 12,
-              left: tooltip.x + 12,
-              background: "white",
-              padding: "14px",
-              borderRadius: "14px",
+              position:
+                "fixed",
+              top:
+                tooltip.y +
+                12,
+              left:
+                tooltip.x +
+                12,
+              background:
+                "white",
+              padding:
+                "14px",
+              borderRadius:
+                "14px",
               boxShadow:
                 "0 8px 24px rgba(0,0,0,0.15)",
               zIndex: 999,
-              width: "260px",
-              pointerEvents: "none"
+              width:
+                "280px",
+              pointerEvents:
+                "none"
             }}
           >
             <div
               style={{
-                marginBottom: "6px"
+                marginBottom:
+                  "6px"
               }}
             >
-              <strong>국가:</strong>{" "}
-              {tooltip.country}
+              <strong>
+                국가:
+              </strong>{" "}
+              {
+                tooltip.country
+              }
             </div>
 
             <div
               style={{
-                marginBottom: "6px"
+                marginBottom:
+                  "6px"
               }}
             >
-              <strong>브랜드:</strong>{" "}
-              {tooltip.brand}
+              <strong>
+                브랜드:
+              </strong>{" "}
+              {
+                tooltip.brand
+              }
             </div>
 
             <div
               style={{
-                marginBottom: "6px"
+                marginBottom:
+                  "6px"
               }}
             >
-              <strong>상태:</strong>{" "}
-              {tooltip.status}
+              <strong>
+                상태:
+              </strong>{" "}
+              {
+                tooltip.status
+              }
+            </div>
+
+            <div
+              style={{
+                marginBottom:
+                  "6px"
+              }}
+            >
+              <strong>
+                건수:
+              </strong>{" "}
+              {
+                tooltip.count
+              }
             </div>
 
             <div>
-              <strong>건수:</strong>{" "}
-              {tooltip.count}
+              <strong>
+                상세:
+              </strong>{" "}
+              {
+                tooltip.details
+              }
             </div>
           </div>
         )}
@@ -270,7 +370,9 @@ export default function Home() {
           }}
         >
           <ZoomableGroup
-            zoom={position.zoom}
+            zoom={
+              position.zoom
+            }
             center={
               position.coordinates
             }
@@ -285,7 +387,8 @@ export default function Home() {
                 geographies.map(
                   (geo) => {
                     const iso3 =
-                      geo.properties
+                      geo
+                        .properties
                         .ISO_A3;
 
                     const countryData =
@@ -295,8 +398,12 @@ export default function Home() {
 
                     return (
                       <Geography
-                        key={geo.rsmKey}
-                        geography={geo}
+                        key={
+                          geo.rsmKey
+                        }
+                        geography={
+                          geo
+                        }
                         fill={getColor(
                           countryData
                         )}
@@ -305,49 +412,60 @@ export default function Home() {
                           0.6
                         }
                         style={{
-                          default: {
-                            outline:
-                              "none"
-                          },
+                          default:
+                            {
+                              outline:
+                                "none"
+                            },
                           hover: {
-                            fill: "#111827",
+                            fill:
+                              "#111827",
                             outline:
                               "none",
                             cursor:
                               "pointer"
                           },
-                          pressed: {
-                            outline:
-                              "none"
-                          }
+                          pressed:
+                            {
+                              outline:
+                                "none"
+                            }
                         }}
                         onMouseEnter={(
                           evt
                         ) => {
-                          setTooltip({
-                            x: evt.clientX,
-                            y: evt.clientY,
-                            country:
-                              countryData?.COUNTRY ||
-                              geo
-                                .properties
-                                .ADMIN,
-                            brand:
-                              countryData?.BRAND ||
-                              "-",
-                            status:
-                              countryData?.STATUS ||
-                              "정보 없음",
-                            count:
-                              countryData?.COUNT ||
-                              0
-                          });
-                        }}
-                        onMouseLeave={() => {
                           setTooltip(
-                            null
+                            {
+                              x:
+                                evt.clientX,
+                              y:
+                                evt.clientY,
+                              country:
+                                countryData?.COUNTRY ||
+                                geo
+                                  .properties
+                                  .ADMIN,
+                              brand:
+                                countryData?.BRAND ||
+                                "-",
+                              status:
+                                getStatusLabel(
+                                  countryData?.STATUS
+                                ),
+                              count:
+                                countryData?.COUNT ||
+                                0,
+                              details:
+                                countryData?.DETAILS ||
+                                "-"
+                            }
                           );
                         }}
+                        onMouseLeave={() =>
+                          setTooltip(
+                            null
+                          )
+                        }
                       />
                     );
                   }
