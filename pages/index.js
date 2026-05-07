@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Papa from "papaparse";
 import {
   ComposableMap,
@@ -13,11 +13,43 @@ const geoUrl =
 const CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vTv9Nf_RdMQwHDRRk1L1PrL6LsBV1hfhjUsZ9MhIV1LPWLOAmmb8BwI-eIavV01nrJORaE0U5Tv4g_b/pub?output=csv";
 
+/**
+ * ISO3 → ISO2 변환
+ * CSV는 ISO2 기준이라 변환 필요
+ */
+const ISO_MAP = {
+  USA: "US",
+  KOR: "KR",
+  JPN: "JP",
+  CHN: "CN",
+  GBR: "GB",
+  FRA: "FR",
+  DEU: "DE",
+  ITA: "IT",
+  ESP: "ES",
+  CAN: "CA",
+  AUS: "AU",
+  BRA: "BR",
+  MEX: "MX",
+  RUS: "RU",
+  IND: "IN",
+  TUR: "TR",
+  SAU: "SA",
+  ARE: "AE",
+  VNM: "VN",
+  THA: "TH",
+  SGP: "SG",
+  IDN: "ID",
+  PHL: "PH",
+  MYS: "MY"
+};
+
 export default function Home() {
   const [data, setData] = useState([]);
   const [brands, setBrands] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState("");
   const [tooltip, setTooltip] = useState(null);
+
   const [position, setPosition] = useState({
     coordinates: [0, 20],
     zoom: 1
@@ -27,12 +59,19 @@ export default function Home() {
     Papa.parse(CSV_URL, {
       download: true,
       header: true,
+      skipEmptyLines: true,
       complete: (results) => {
-        setData(results.data);
+        const cleaned = results.data.map((item) => ({
+          CODE: item.CODE?.trim(),
+          BRAND: item.BRAND?.trim(),
+          STATUS: item.STATUS?.trim()
+        }));
+
+        setData(cleaned);
 
         const uniqueBrands = [
-          ...new Set(results.data.map((item) => item.BRAND))
-        ];
+          ...new Set(cleaned.map((item) => item.BRAND))
+        ].filter(Boolean);
 
         setBrands(uniqueBrands);
 
@@ -43,24 +82,28 @@ export default function Home() {
     });
   }, []);
 
-  const getCountryData = (iso) => {
-    return data.find(
-      (item) =>
-        item.CODE === iso &&
-        item.BRAND === selectedBrand
+  const filteredData = useMemo(() => {
+    return data.filter(
+      (item) => item.BRAND === selectedBrand
+    );
+  }, [data, selectedBrand]);
+
+  const getCountryData = (iso2) => {
+    return filteredData.find(
+      (item) => item.CODE === iso2
     );
   };
 
   const getColor = (country) => {
     if (!country) return "#D1D5DB";
 
-    const status = country.STATUS?.toLowerCase();
+    const status = country.STATUS || "";
 
-    if (status?.includes("등록")) return "#22C55E";
-    if (status?.includes("출원")) return "#3B82F6";
-    if (status?.includes("거절")) return "#EF4444";
-    if (status?.includes("분쟁")) return "#EF4444";
-    if (status?.includes("이의")) return "#FACC15";
+    if (status.includes("등록")) return "#22C55E";
+    if (status.includes("출원")) return "#3B82F6";
+    if (status.includes("거절")) return "#EF4444";
+    if (status.includes("분쟁")) return "#EF4444";
+    if (status.includes("이의")) return "#FACC15";
 
     return "#9CA3AF";
   };
@@ -89,10 +132,11 @@ export default function Home() {
           value={selectedBrand}
           onChange={(e) => setSelectedBrand(e.target.value)}
           style={{
-            padding: "10px",
-            borderRadius: "8px",
+            padding: "10px 14px",
+            borderRadius: "10px",
             border: "1px solid #CBD5E1",
-            fontSize: "16px"
+            fontSize: "16px",
+            background: "white"
           }}
         >
           {brands.map((brand) => (
@@ -106,29 +150,39 @@ export default function Home() {
       <div
         style={{
           background: "white",
-          borderRadius: "16px",
+          borderRadius: "20px",
           padding: "20px",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
-          position: "relative"
+          boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+          position: "relative",
+          overflow: "hidden"
         }}
       >
         {tooltip && (
           <div
             style={{
-              position: "absolute",
-              top: tooltip.y,
-              left: tooltip.x,
+              position: "fixed",
+              top: tooltip.y + 12,
+              left: tooltip.x + 12,
               background: "white",
-              padding: "12px",
-              borderRadius: "10px",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-              zIndex: 10,
-              width: "220px"
+              padding: "14px",
+              borderRadius: "14px",
+              boxShadow: "0 6px 20px rgba(0,0,0,0.15)",
+              zIndex: 999,
+              width: "240px",
+              pointerEvents: "none"
             }}
           >
-            <div><strong>국가:</strong> {tooltip.country}</div>
-            <div><strong>브랜드:</strong> {tooltip.brand}</div>
-            <div><strong>상태:</strong> {tooltip.status}</div>
+            <div style={{ marginBottom: "6px" }}>
+              <strong>국가:</strong> {tooltip.country}
+            </div>
+
+            <div style={{ marginBottom: "6px" }}>
+              <strong>브랜드:</strong> {tooltip.brand}
+            </div>
+
+            <div>
+              <strong>상태:</strong> {tooltip.status}
+            </div>
           </div>
         )}
 
@@ -144,13 +198,16 @@ export default function Home() {
           <ZoomableGroup
             zoom={position.zoom}
             center={position.coordinates}
-            onMoveEnd={setPosition}
+            onMoveEnd={(pos) => setPosition(pos)}
           >
             <Geographies geography={geoUrl}>
               {({ geographies }) =>
                 geographies.map((geo) => {
-                  const iso = geo.properties.ISO_A2;
-                  const countryData = getCountryData(iso);
+                  const iso3 = geo.id;
+                  const iso2 = ISO_MAP[iso3];
+
+                  const countryData =
+                    getCountryData(iso2);
 
                   return (
                     <Geography
@@ -158,7 +215,7 @@ export default function Home() {
                       geography={geo}
                       fill={getColor(countryData)}
                       stroke="#FFFFFF"
-                      strokeWidth={0.5}
+                      strokeWidth={0.6}
                       style={{
                         default: {
                           outline: "none"
@@ -176,11 +233,14 @@ export default function Home() {
                         setTooltip({
                           x: evt.clientX,
                           y: evt.clientY,
-                          country: geo.properties.NAME,
+                          country:
+                            geo.properties.name ||
+                            geo.properties.NAME,
                           brand:
                             countryData?.BRAND || "-",
                           status:
-                            countryData?.STATUS || "정보 없음"
+                            countryData?.STATUS ||
+                            "정보 없음"
                         });
                       }}
                       onMouseLeave={() => {
@@ -198,7 +258,8 @@ export default function Home() {
       <div
         style={{
           display: "flex",
-          gap: "20px",
+          flexWrap: "wrap",
+          gap: "18px",
           marginTop: "20px",
           fontSize: "14px"
         }}
