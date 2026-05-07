@@ -13,37 +13,6 @@ const geoUrl =
 const CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vTv9Nf_RdMQwHDRRk1L1PrL6LsBV1hfhjUsZ9MhIV1LPWLOAmmb8BwI-eIavV01nrJORaE0U5Tv4g_b/pub?output=csv";
 
-/**
- * ISO3 → ISO2 변환
- * CSV는 ISO2 기준이라 변환 필요
- */
-const ISO_MAP = {
-  USA: "US",
-  KOR: "KR",
-  JPN: "JP",
-  CHN: "CN",
-  GBR: "GB",
-  FRA: "FR",
-  DEU: "DE",
-  ITA: "IT",
-  ESP: "ES",
-  CAN: "CA",
-  AUS: "AU",
-  BRA: "BR",
-  MEX: "MX",
-  RUS: "RU",
-  IND: "IN",
-  TUR: "TR",
-  SAU: "SA",
-  ARE: "AE",
-  VNM: "VN",
-  THA: "TH",
-  SGP: "SG",
-  IDN: "ID",
-  PHL: "PH",
-  MYS: "MY"
-};
-
 export default function Home() {
   const [data, setData] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -88,9 +57,9 @@ export default function Home() {
     );
   }, [data, selectedBrand]);
 
-  const getCountryData = (iso2) => {
+  const getCountryData = (iso3) => {
     return filteredData.find(
-      (item) => item.CODE === iso2
+      (item) => item.CODE === iso3
     );
   };
 
@@ -136,7 +105,8 @@ export default function Home() {
             borderRadius: "10px",
             border: "1px solid #CBD5E1",
             fontSize: "16px",
-            background: "white"
+            background: "white",
+            minWidth: "220px"
           }}
         >
           {brands.map((brand) => (
@@ -204,10 +174,9 @@ export default function Home() {
               {({ geographies }) =>
                 geographies.map((geo) => {
                   const iso3 = geo.id;
-                  const iso2 = ISO_MAP[iso3];
 
                   const countryData =
-                    getCountryData(iso2);
+                    getCountryData(iso3);
 
                   return (
                     <Geography
@@ -221,7 +190,7 @@ export default function Home() {
                           outline: "none"
                         },
                         hover: {
-                          fill: "#0F172A",
+                          fill: "#111827",
                           outline: "none",
                           cursor: "pointer"
                         },
