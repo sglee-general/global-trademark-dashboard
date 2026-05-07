@@ -1,16 +1,20 @@
 {
-  "name": "trademark-dashboard",
-  "version": "1.0.0",
+  "name": "global-trademark-dashboard",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "react-simple-maps": "latest",
-    "d3-fetch": "latest"
+    "react-simple-maps": "^3.0.0",
+    "papaparse": "^5.4.1",
+    "react-tooltip": "^5.26.3",
+    "d3-geo": "^3.1.0"
   }
 }
