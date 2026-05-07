@@ -8,43 +8,10 @@ import {
 } from "react-simple-maps";
 
 const geoUrl =
-  "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json";
+  "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson";
 
 const CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vTv9Nf_RdMQwHDRRk1L1PrL6LsBV1hfhjUsZ9MhIV1LPWLOAmmb8BwI-eIavV01nrJORaE0U5Tv4g_b/pub?output=csv";
-
-/**
- * 숫자 국가코드 → ISO3 변환
- */
-const ISO_MAP = {
-  "410": "KOR",
-  "156": "CHN",
-  "840": "USA",
-  "392": "JPN",
-  "608": "PHL",
-  "704": "VNM",
-  "764": "THA",
-  "458": "MYS",
-  "702": "SGP",
-  "276": "DEU",
-  "250": "FRA",
-  "380": "ITA",
-  "724": "ESP",
-  "620": "PRT",
-  "528": "NLD",
-  "56": "BEL",
-  "442": "LUX",
-  "40": "AUT",
-  "203": "CZE",
-  "703": "SVK",
-  "348": "HUN",
-  "616": "POL",
-  "300": "GRC",
-  "191": "HRV",
-  "356": "IND",
-  "344": "HKG",
-  "158": "TWN"
-};
 
 export default function Home() {
   const [data, setData] = useState([]);
@@ -113,6 +80,9 @@ export default function Home() {
     );
   }, [data, selectedBrand]);
 
+  /**
+   * 국가별 데이터 집계
+   */
   const getCountryData = (iso3) => {
     const rows = filteredData.filter(
       (item) => item.CODE === iso3
@@ -125,26 +95,31 @@ export default function Home() {
       r.STATUS.toLowerCase()
     );
 
-    let finalStatus = "green";
+    /**
+     * 실무형 우선순위
+     * green > blue > yellow > red
+     */
+
+    let finalStatus = "red";
 
     if (
       statuses.some((s) =>
-        s.includes("red")
+        s.includes("green")
       )
     ) {
-      finalStatus = "red";
-    } else if (
-      statuses.some((s) =>
-        s.includes("yellow")
-      )
-    ) {
-      finalStatus = "yellow";
+      finalStatus = "green";
     } else if (
       statuses.some((s) =>
         s.includes("blue")
       )
     ) {
       finalStatus = "blue";
+    } else if (
+      statuses.some((s) =>
+        s.includes("yellow")
+      )
+    ) {
+      finalStatus = "yellow";
     }
 
     return {
@@ -154,11 +129,36 @@ export default function Home() {
         selectedBrand,
       STATUS:
         finalStatus,
+
+      GREEN_COUNT:
+        statuses.filter((s) =>
+          s.includes("green")
+        ).length,
+
+      BLUE_COUNT:
+        statuses.filter((s) =>
+          s.includes("blue")
+        ).length,
+
+      RED_COUNT:
+        statuses.filter((s) =>
+          s.includes("red")
+        ).length,
+
+      YELLOW_COUNT:
+        statuses.filter((s) =>
+          s.includes("yellow")
+        ).length,
+
+      TOTAL_COUNT:
+        rows.length,
+
       DETAILS: rows
-        .map((r) => r.DETAILS)
-        .filter(Boolean)
-        .join(", "),
-      COUNT: rows.length
+        .map(
+          (r) =>
+            `${r.CLASS} / ${r.TYPE} / ${r.DETAILS}`
+        )
+        .join("\n")
     };
   };
 
@@ -175,14 +175,14 @@ export default function Home() {
       case "blue":
         return "#3B82F6";
 
-      case "red":
-        return "#EF4444";
-
       case "yellow":
         return "#FACC15";
 
+      case "red":
+        return "#EF4444";
+
       default:
-        return "#9CA3AF";
+        return "#D1D5DB";
     }
   };
 
@@ -196,11 +196,11 @@ export default function Home() {
       case "blue":
         return "출원 진행";
 
-      case "red":
-        return "거절/분쟁";
-
       case "yellow":
         return "이의신청";
+
+      case "red":
+        return "거절/분쟁";
 
       default:
         return "정보 없음";
@@ -211,7 +211,7 @@ export default function Home() {
     <div
       style={{
         fontFamily:
-          "Pretendard, sans-serif",
+          "Pretendard, Malgun Gothic, sans-serif",
         background:
           "#F8FAFC",
         minHeight: "100vh",
@@ -221,173 +221,348 @@ export default function Home() {
       <h1
         style={{
           fontSize: "34px",
-          fontWeight: 700,
-          marginBottom: "20px"
+          fontWeight: "700",
+          marginBottom:
+            "20px"
         }}
       >
         비나우 글로벌 상표권 등록 현황
       </h1>
 
-      <select
-        value={selectedBrand}
-        onChange={(e) =>
-          setSelectedBrand(
-            e.target.value
-          )
-        }
+      <div
         style={{
-          marginBottom: "20px",
-          padding:
-            "12px 16px",
-          borderRadius: "12px",
-          border:
-            "1px solid #CBD5E1",
-          minWidth: "240px"
+          marginBottom:
+            "20px"
         }}
       >
-        {brands.map((brand) => (
-          <option
-            key={brand}
-            value={brand}
-          >
-            {brand}
-          </option>
-        ))}
-      </select>
-
-      {tooltip && (
-        <div
+        <select
+          value={
+            selectedBrand
+          }
+          onChange={(e) =>
+            setSelectedBrand(
+              e.target.value
+            )
+          }
           style={{
-            position: "fixed",
-            top: tooltip.y + 10,
-            left: tooltip.x + 10,
-            background: "white",
-            padding: "14px",
-            borderRadius: "14px",
-            boxShadow:
-              "0 8px 24px rgba(0,0,0,0.15)",
-            zIndex: 999,
-            width: "280px"
+            padding:
+              "12px 16px",
+            borderRadius:
+              "12px",
+            border:
+              "1px solid #CBD5E1",
+            background:
+              "white",
+            fontSize:
+              "16px",
+            minWidth:
+              "240px"
           }}
         >
-          <div>
-            <strong>국가:</strong>{" "}
-            {tooltip.country}
-          </div>
+          {brands.map(
+            (brand) => (
+              <option
+                key={brand}
+                value={brand}
+              >
+                {brand}
+              </option>
+            )
+          )}
+        </select>
+      </div>
 
-          <div>
-            <strong>브랜드:</strong>{" "}
-            {tooltip.brand}
-          </div>
+      <div
+        style={{
+          background:
+            "white",
+          borderRadius:
+            "24px",
+          padding: "20px",
+          boxShadow:
+            "0 4px 24px rgba(0,0,0,0.08)",
+          position:
+            "relative",
+          overflow:
+            "hidden"
+        }}
+      >
+        {tooltip && (
+          <div
+            style={{
+              position:
+                "fixed",
+              top:
+                tooltip.y +
+                12,
+              left:
+                tooltip.x +
+                12,
+              background:
+                "white",
+              padding:
+                "16px",
+              borderRadius:
+                "14px",
+              boxShadow:
+                "0 8px 24px rgba(0,0,0,0.15)",
+              zIndex: 999,
+              width:
+                "340px",
+              pointerEvents:
+                "none",
+              fontSize: "14px"
+            }}
+          >
+            <div
+              style={{
+                marginBottom:
+                  "8px"
+              }}
+            >
+              <strong>
+                국가:
+              </strong>{" "}
+              {
+                tooltip.country
+              }
+            </div>
 
-          <div>
-            <strong>상태:</strong>{" "}
-            {tooltip.status}
-          </div>
+            <div
+              style={{
+                marginBottom:
+                  "8px"
+              }}
+            >
+              <strong>
+                브랜드:
+              </strong>{" "}
+              {
+                tooltip.brand
+              }
+            </div>
 
-          <div>
-            <strong>건수:</strong>{" "}
-            {tooltip.count}
-          </div>
+            <div
+              style={{
+                marginBottom:
+                  "8px"
+              }}
+            >
+              <strong>
+                현재 상태:
+              </strong>{" "}
+              {
+                tooltip.status
+              }
+            </div>
 
-          <div>
-            <strong>상세:</strong>{" "}
-            {tooltip.details}
-          </div>
-        </div>
-      )}
+            <div
+              style={{
+                marginBottom:
+                  "8px"
+              }}
+            >
+              🟩 등록:
+              {" "}
+              {
+                tooltip.green
+              }
+              건
+            </div>
 
-      <ComposableMap>
-        <ZoomableGroup
-          zoom={position.zoom}
-          center={
-            position.coordinates
-          }
-          onMoveEnd={(pos) =>
-            setPosition(pos)
-          }
+            <div
+              style={{
+                marginBottom:
+                  "8px"
+              }}
+            >
+              🟦 출원:
+              {" "}
+              {
+                tooltip.blue
+              }
+              건
+            </div>
+
+            <div
+              style={{
+                marginBottom:
+                  "8px"
+              }}
+            >
+              🟨 이의:
+              {" "}
+              {
+                tooltip.yellow
+              }
+              건
+            </div>
+
+            <div
+              style={{
+                marginBottom:
+                  "8px"
+              }}
+            >
+              🟥 거절:
+              {" "}
+              {
+                tooltip.red
+              }
+              건
+            </div>
+
+            <hr />
+
+            <div
+              style={{
+                whiteSpace:
+                  "pre-line",
+                maxHeight:
+                  "160px",
+                overflow:
+                  "auto",
+                marginTop:
+                  "10px"
+              }}
+            >
+              {
+                tooltip.details
+              }
+            </div>
+          </div>
+        )}
+
+        <ComposableMap
+          projectionConfig={{
+            scale: 160
+          }}
+          style={{
+            width: "100%",
+            height: "auto"
+          }}
         >
-          <Geographies geography={geoUrl}>
-            {({ geographies }) =>
-              geographies.map(
-                (geo) => {
-                  const iso3 =
-                    ISO_MAP[geo.id];
-
-                  const countryData =
-                    getCountryData(
-                      iso3
-                    );
-
-                  return (
-                    <Geography
-                      key={
-                        geo.rsmKey
-                      }
-                      geography={
-                        geo
-                      }
-                      fill={getColor(
-                        countryData
-                      )}
-                      stroke="#FFFFFF"
-                      strokeWidth={
-                        0.5
-                      }
-                      style={{
-                        default:
-                          {
-                            outline:
-                              "none"
-                          },
-                        hover: {
-                          fill:
-                            "#111827",
-                          outline:
-                            "none"
-                        }
-                      }}
-                      onMouseEnter={(
-                        evt
-                      ) => {
-                        setTooltip(
-                          {
-                            x:
-                              evt.clientX,
-                            y:
-                              evt.clientY,
-                            country:
-                              countryData?.COUNTRY ||
-                              "",
-                            brand:
-                              countryData?.BRAND ||
-                              "-",
-                            status:
-                              getStatusLabel(
-                                countryData?.STATUS
-                              ),
-                            count:
-                              countryData?.COUNT ||
-                              0,
-                            details:
-                              countryData?.DETAILS ||
-                              "-"
-                          }
-                        );
-                      }}
-                      onMouseLeave={() =>
-                        setTooltip(
-                          null
-                        )
-                      }
-                    />
-                  );
-                }
-              )
+          <ZoomableGroup
+            zoom={
+              position.zoom
             }
-          </Geographies>
-        </ZoomableGroup>
-      </ComposableMap>
+            center={
+              position.coordinates
+            }
+            onMoveEnd={(pos) =>
+              setPosition(pos)
+            }
+          >
+            <Geographies geography={geoUrl}>
+              {({
+                geographies
+              }) =>
+                geographies.map(
+                  (geo) => {
+                    const iso3 =
+                      geo.id;
+
+                    const countryData =
+                      getCountryData(
+                        iso3
+                      );
+
+                    return (
+                      <Geography
+                        key={
+                          geo.rsmKey
+                        }
+                        geography={
+                          geo
+                        }
+                        fill={getColor(
+                          countryData
+                        )}
+                        stroke="#FFFFFF"
+                        strokeWidth={
+                          0.6
+                        }
+                        style={{
+                          default:
+                            {
+                              outline:
+                                "none"
+                            },
+                          hover: {
+                            fill:
+                              "#111827",
+                            outline:
+                              "none",
+                            cursor:
+                              "pointer"
+                          },
+                          pressed:
+                            {
+                              outline:
+                                "none"
+                            }
+                        }}
+                        onMouseEnter={(
+                          evt
+                        ) => {
+                          setTooltip(
+                            {
+                              x:
+                                evt.clientX,
+                              y:
+                                evt.clientY,
+
+                              country:
+                                countryData?.COUNTRY ||
+                                geo
+                                  .properties
+                                  .name,
+
+                              brand:
+                                countryData?.BRAND ||
+                                "-",
+
+                              status:
+                                getStatusLabel(
+                                  countryData?.STATUS
+                                ),
+
+                              green:
+                                countryData?.GREEN_COUNT ||
+                                0,
+
+                              blue:
+                                countryData?.BLUE_COUNT ||
+                                0,
+
+                              yellow:
+                                countryData?.YELLOW_COUNT ||
+                                0,
+
+                              red:
+                                countryData?.RED_COUNT ||
+                                0,
+
+                              details:
+                                countryData?.DETAILS ||
+                                "-"
+                            }
+                          );
+                        }}
+                        onMouseLeave={() =>
+                          setTooltip(
+                            null
+                          )
+                        }
+                      />
+                    );
+                  }
+                )
+              }
+            </Geographies>
+          </ZoomableGroup>
+        </ComposableMap>
+      </div>
     </div>
   );
 }
