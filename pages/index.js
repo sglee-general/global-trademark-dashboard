@@ -2,12 +2,11 @@ import React, { useEffect, useState } from "react";
 import { csv } from "d3-fetch";
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 
-const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTv9Nf_RdMQwHDRRk1L1PrL6LsBV1hfhjUsZ9MhIV1LPWLOAmmb8BwI-eIavV01nrJORaE0U5Tv4g_b/pub?gid=916788690&single=true&output=csv";
+const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTv9Nf_RdMQwHDRRk1L1PrL6LsBV1hfhjUsZ9MhIV1LPWLOAmmb8BwI-eIavV01nrJORaE0U5Tv4g_b/pub?output=csv";
+// ISO_A3 코드가 가장 정확하게 들어있는 지도 데이터 소스입니다.
 const geoUrl = "https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson";
 
-const colorMap = { 
-  Green: "#27ae60", Blue: "#3498db", Yellow: "#f1c40f", Red: "#e74c3c", Grey: "#dfe4ea" 
-};
+const colorMap = { Green: "#27ae60", Blue: "#3498db", Yellow: "#f1c40f", Red: "#e74c3c", Grey: "#dfe4ea" };
 
 export default function Dashboard() {
   const [data, setData] = useState([]);
@@ -17,8 +16,16 @@ export default function Dashboard() {
   useEffect(() => {
     csv(SHEET_URL).then((rows) => {
       if (rows) {
-        console.log("첫번째 행 데이터 샘플:", rows[0]); // 브라우저 콘솔에서 실제 데이터 확인용
-        setData(rows);
+        // [핵심] 모든 데이터의 키(항목명)와 값의 앞뒤 공백을 제거하여 표준화합니다.
+        const cleaned = rows.map(row => {
+          const newRow = {};
+          Object.keys(row).forEach(key => {
+            const cleanKey = key.trim();
+            newRow[cleanKey] = row[key] ? row[key].trim() : "";
+          });
+          return newRow;
+        });
+        setData(cleaned);
       }
     });
   }, []);
@@ -28,38 +35,35 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f1f2f6", padding: "30px", fontFamily: "sans-serif" }}>
-      
-      <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
-        <h1 style={{ fontSize: "24px", color: "#2f3542", fontWeight: "bold" }}>비나우 글로벌 상표권 현황</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <strong>브랜드 필터:</strong>
-          <select onChange={(e) => setSelectedBrand(e.target.value)} style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid #ccc" }}>
+      <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+        <h1 style={{ fontSize: "26px", color: "#2f3542", fontWeight: "bold" }}>비나우 글로벌 상표권 현황</h1>
+        <div style={{ background: "#fff", padding: "10px 15px", borderRadius: "12px", boxShadow: "0 2px 5px rgba(0,0,0,0.05)" }}>
+          <strong style={{ fontSize: "14px", marginRight: "10px" }}>브랜드 필터</strong>
+          <select onChange={(e) => setSelectedBrand(e.target.value)} style={{ border: "none", outline: "none", cursor: "pointer" }}>
             {brands.map(b => <option key={b}>{b}</option>)}
           </select>
         </div>
       </div>
 
-      <div style={{ maxWidth: "1100px", margin: "0 auto", background: "#fff", borderRadius: "20px", boxShadow: "0 10px 30px rgba(0,0,0,0.1)", position: "relative", overflow: "hidden" }}>
+      <div style={{ maxWidth: "1100px", margin: "0 auto", background: "#fff", borderRadius: "24px", boxShadow: "0 10px 30px rgba(0,0,0,0.1)", position: "relative", overflow: "hidden" }}>
         <ComposableMap projectionConfig={{ scale: 145 }} style={{ width: "100%", height: "600px" }}>
           <ZoomableGroup maxZoom={5} minZoom={1} translateExtent={[[0, 0], [800, 600]]}>
             <Geographies geography={geoUrl}>
               {({ geographies }) => geographies.map((geo) => {
-                // 1. 지도에서 국가 코드 가져오기 (예: "CHN", "USA")
-                const countryISO = (geo.properties.ISO_A3 || geo.id || "").toString().toUpperCase().trim();
+                // 지도에서 국가 코드(ISO 3자리) 추출
+                const countryISO = (geo.properties.ISO_A3 || geo.properties.iso_a3 || geo.id || "").toString().toUpperCase().trim();
                 
-                // 2. 시트 데이터와 매칭 시도
+                // 시트 데이터와 매칭 (항목명에 'ISO3'가 포함된 열을 찾아 대조)
                 const info = filteredData.find(d => {
-                  // 시트의 'CountryCode (ISO3)' 컬럼 값을 가져옴
-                  const csvCode = (d["CountryCode (ISO3)"] || "").toString().toUpperCase().trim();
-                  return csvCode === countryISO && csvCode !== "";
+                  const targetKey = Object.keys(d).find(k => k.includes("ISO3"));
+                  return targetKey && d[targetKey].toUpperCase() === countryISO;
                 });
 
                 let fillColor = colorMap.Grey;
                 if (info && info.Status) {
-                    const statusVal = info.Status.trim();
-                    // 대소문자 무관하게 색상 매칭 (green -> Green)
-                    const statusKey = Object.keys(colorMap).find(k => k.toLowerCase() === statusVal.toLowerCase());
-                    fillColor = colorMap[statusKey] || colorMap.Grey;
+                  // Status 값 매칭 (대소문자 무시)
+                  const s = info.Status.charAt(0).toUpperCase() + info.Status.slice(1).toLowerCase();
+                  fillColor = colorMap[s] || colorMap.Grey;
                 }
 
                 return (
@@ -82,6 +86,7 @@ export default function Dashboard() {
           </ZoomableGroup>
         </ComposableMap>
 
+        {/* 상세 정보 모달 */}
         {selectedInfo && (
           <div style={{ position: "absolute", bottom: "30px", left: "50%", transform: "translateX(-50%)", width: "320px", background: "#fff", padding: "20px", borderRadius: "18px", boxShadow: "0 15px 40px rgba(0,0,0,0.2)", border: "1px solid #38bdf8", zIndex: 100 }}>
             <button onClick={() => setSelectedInfo(null)} style={{ position: "absolute", top: "12px", right: "12px", border: "none", background: "none", cursor: "pointer", fontSize: "16px", color: "#999" }}>✕</button>
