@@ -2,69 +2,59 @@ import React, { useEffect, useState } from "react";
 import { csv } from "d3-fetch";
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 
-const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTv9Nf_RdMQwHDRRk1L1PrL6LsBV1hfhjUsZ9MhIV1LPWLOAmmb8BwI-eIavV01nrJORaE0U5Tv4g_b/pub?output=csv";
-// ISO_A3 코드가 가장 정확하게 들어있는 지도 데이터 소스입니다.
+const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTv9Nf_RdMQwHDRRk1L1PrL6LsBV1hfhjUsZ9MhIV1LPWLOAmmb8BwI-eIavV01nrJORaE0U5Tv4g_b/pub?gid=916788690&single=true&output=csv";
 const geoUrl = "https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson";
 
-const colorMap = { Green: "#27ae60", Blue: "#3498db", Yellow: "#f1c40f", Red: "#e74c3c", Grey: "#dfe4ea" };
+const colorMap = { GREEN: "#27ae60", BLUE: "#3498db", YELLOW: "#f1c40f", RED: "#e74c3c", GREY: "#dfe4ea" };
 
-export default function Dashboard() {
+export default function BenowDashboard() {
   const [data, setData] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState("All");
   const [selectedInfo, setSelectedInfo] = useState(null);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     csv(SHEET_URL).then((rows) => {
-      if (rows) {
-        // [핵심] 모든 데이터의 키(항목명)와 값의 앞뒤 공백을 제거하여 표준화합니다.
+      if (rows && rows.length > 0) {
+        // 모든 키와 값을 대문자로 통일하여 저장 (매칭 확률 100%)
         const cleaned = rows.map(row => {
           const newRow = {};
           Object.keys(row).forEach(key => {
-            const cleanKey = key.trim();
-            newRow[cleanKey] = row[key] ? row[key].trim() : "";
+            const newKey = key.trim().toUpperCase();
+            newRow[newKey] = row[key] ? row[key].trim().toUpperCase() : "";
           });
           return newRow;
         });
         setData(cleaned);
+      } else {
+        setLoadError("시트에서 데이터를 읽어오지 못했습니다. CSV 주소를 확인해주세요.");
       }
-    });
+    }).catch(err => setLoadError("데이터 로드 오류: " + err.message));
   }, []);
 
-  const brands = ["All", ...new Set(data.map(d => d.Brand).filter(Boolean))];
-  const filteredData = selectedBrand === "All" ? data : data.filter(d => d.Brand === selectedBrand);
+  const brands = ["All", ...new Set(data.map(d => d.BRAND).filter(Boolean))];
+  const filteredData = selectedBrand === "All" ? data : data.filter(d => d.BRAND === selectedBrand);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f1f2f6", padding: "30px", fontFamily: "sans-serif" }}>
-      <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <h1 style={{ fontSize: "26px", color: "#2f3542", fontWeight: "bold" }}>비나우 글로벌 상표권 현황</h1>
-        <div style={{ background: "#fff", padding: "10px 15px", borderRadius: "12px", boxShadow: "0 2px 5px rgba(0,0,0,0.05)" }}>
-          <strong style={{ fontSize: "14px", marginRight: "10px" }}>브랜드 필터</strong>
-          <select onChange={(e) => setSelectedBrand(e.target.value)} style={{ border: "none", outline: "none", cursor: "pointer" }}>
-            {brands.map(b => <option key={b}>{b}</option>)}
-          </select>
-        </div>
+    <div style={{ minHeight: "100vh", background: "#f8fafc", padding: "30px", fontFamily: "sans-serif" }}>
+      <h1 style={{ textAlign: "center", color: "#1e293b", marginBottom: "30px" }}>비나우 글로벌 상표권 현황</h1>
+      
+      {/* 상단 필터 */}
+      <div style={{ maxWidth: "1100px", margin: "0 auto 20px", display: "flex", justifyContent: "flex-end" }}>
+        <select onChange={(e) => setSelectedBrand(e.target.value)} style={{ padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
+          {brands.map(b => <option key={b}>{b}</option>)}
+        </select>
       </div>
 
-      <div style={{ maxWidth: "1100px", margin: "0 auto", background: "#fff", borderRadius: "24px", boxShadow: "0 10px 30px rgba(0,0,0,0.1)", position: "relative", overflow: "hidden" }}>
+      {/* 지도 영역 */}
+      <div style={{ maxWidth: "1100px", margin: "0 auto", background: "#fff", borderRadius: "20px", boxShadow: "0 10px 25px rgba(0,0,0,0.1)", position: "relative", overflow: "hidden" }}>
         <ComposableMap projectionConfig={{ scale: 145 }} style={{ width: "100%", height: "600px" }}>
-          <ZoomableGroup maxZoom={5} minZoom={1} translateExtent={[[0, 0], [800, 600]]}>
+          <ZoomableGroup maxZoom={3} minZoom={1}>
             <Geographies geography={geoUrl}>
               {({ geographies }) => geographies.map((geo) => {
-                // 지도에서 국가 코드(ISO 3자리) 추출
-                const countryISO = (geo.properties.ISO_A3 || geo.properties.iso_a3 || geo.id || "").toString().toUpperCase().trim();
-                
-                // 시트 데이터와 매칭 (항목명에 'ISO3'가 포함된 열을 찾아 대조)
-                const info = filteredData.find(d => {
-                  const targetKey = Object.keys(d).find(k => k.includes("ISO3"));
-                  return targetKey && d[targetKey].toUpperCase() === countryISO;
-                });
-
-                let fillColor = colorMap.Grey;
-                if (info && info.Status) {
-                  // Status 값 매칭 (대소문자 무시)
-                  const s = info.Status.charAt(0).toUpperCase() + info.Status.slice(1).toLowerCase();
-                  fillColor = colorMap[s] || colorMap.Grey;
-                }
+                const mapISO = (geo.properties.ISO_A3 || geo.id || "").toUpperCase();
+                const info = filteredData.find(d => d.CODE === mapISO);
+                const fillColor = info ? (colorMap[info.STATUS] || colorMap.GREY) : colorMap.GREY;
 
                 return (
                   <Geography
@@ -76,8 +66,7 @@ export default function Dashboard() {
                     }}
                     style={{
                       default: { fill: fillColor, outline: "none", stroke: "#fff", strokeWidth: 0.5 },
-                      hover: { fill: "#adb5bd", cursor: "pointer", outline: "none" },
-                      pressed: { fill: "#6c757d", outline: "none" }
+                      hover: { fill: "#94a3b8", cursor: "pointer", outline: "none" }
                     }}
                   />
                 );
@@ -86,34 +75,45 @@ export default function Dashboard() {
           </ZoomableGroup>
         </ComposableMap>
 
-        {/* 상세 정보 모달 */}
+        {/* 모달 정보창 */}
         {selectedInfo && (
-          <div style={{ position: "absolute", bottom: "30px", left: "50%", transform: "translateX(-50%)", width: "320px", background: "#fff", padding: "20px", borderRadius: "18px", boxShadow: "0 15px 40px rgba(0,0,0,0.2)", border: "1px solid #38bdf8", zIndex: 100 }}>
-            <button onClick={() => setSelectedInfo(null)} style={{ position: "absolute", top: "12px", right: "12px", border: "none", background: "none", cursor: "pointer", fontSize: "16px", color: "#999" }}>✕</button>
-            <h3 style={{ margin: "0 0 10px", borderBottom: "2px solid #38bdf8", paddingBottom: "5px" }}>{selectedInfo.name}</h3>
-            {selectedInfo.empty ? (
-              <p style={{ fontSize: "14px", color: "#777" }}>이 국가에는 등록된 데이터가 없습니다.</p>
-            ) : (
-              <div style={{ fontSize: "14px", lineHeight: "1.6" }}>
-                <div><strong>브랜드:</strong> {selectedInfo.Brand}</div>
-                <div><strong>상태:</strong> {selectedInfo.Status}</div>
-                <div><strong>상품류:</strong> {selectedInfo.class}류</div>
-                <div style={{ marginTop: "10px", padding: "10px", background: "#f8f9fa", borderRadius: "8px", fontSize: "13px", color: "#555", borderLeft: "4px solid #38bdf8" }}>
-                  {selectedInfo.Details}
-                </div>
+          <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "320px", background: "#fff", padding: "25px", borderRadius: "20px", boxShadow: "0 20px 50px rgba(0,0,0,0.2)", zIndex: 100, border: "2px solid #38bdf8" }}>
+            <button onClick={() => setSelectedInfo(null)} style={{ position: "absolute", top: "15px", right: "15px", border: "none", background: "none", cursor: "pointer", fontSize: "18px" }}>✕</button>
+            <h3 style={{ margin: "0 0 15px", borderBottom: "2px solid #38bdf8", display: "inline-block" }}>{selectedInfo.name}</h3>
+            {selectedInfo.empty ? <p>등록 정보 없음</p> : (
+              <div style={{ fontSize: "14px", lineHeight: "1.8" }}>
+                <div><strong>브랜드:</strong> {selectedInfo.BRAND}</div>
+                <div><strong>상태:</strong> {selectedInfo.STATUS}</div>
+                <div><strong>내용:</strong> {selectedInfo.DETAILS}</div>
               </div>
             )}
           </div>
         )}
       </div>
 
-      <div style={{ marginTop: "20px", display: "flex", gap: "25px", justifyContent: "center" }}>
-        {Object.entries(colorMap).map(([label, color]) => (
-          <div key={label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div style={{ width: "14px", height: "14px", background: color, borderRadius: "4px" }}></div>
-            <span style={{ fontSize: "13px", color: "#555" }}>{label === "Grey" ? "미출원/정보없음" : label}</span>
-          </div>
-        ))}
+      {/* 🛠️ [Plan B] 자가진단 테이블: 지도가 회색일 때 아래 표가 나오는지 확인하세요 */}
+      <div style={{ maxWidth: "1100px", margin: "40px auto", padding: "20px", background: "#fff", borderRadius: "10px", border: "1px solid #ddd" }}>
+        <h4 style={{ marginTop: 0 }}>📊 데이터 로드 진단 (상단 지도가 회색일 경우 확인용)</h4>
+        {loadError && <p style={{ color: "red" }}>{loadError}</p>}
+        <table style={{ width: "100%", fontSize: "12px", textAlign: "left", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#f1f5f9" }}>
+              <th style={{ padding: "8px", border: "1px solid #ddd" }}>BRAND</th>
+              <th style={{ padding: "8px", border: "1px solid #ddd" }}>CODE</th>
+              <th style={{ padding: "8px", border: "1px solid #ddd" }}>STATUS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.slice(0, 5).map((row, i) => (
+              <tr key={i}>
+                <td style={{ padding: "8px", border: "1px solid #ddd" }}>{row.BRAND}</td>
+                <td style={{ padding: "8px", border: "1px solid #ddd" }}>{row.CODE}</td>
+                <td style={{ padding: "8px", border: "1px solid #ddd" }}>{row.STATUS}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p style={{ fontSize: "11px", color: "#666", marginTop: "10px" }}>* 위 표에 데이터가 보인다면 시트 연결은 성공한 것입니다. 지도가 회색이라면 CODE 값이 'KOR', 'USA' 등과 정확히 일치하는지 확인하세요.</p>
       </div>
     </div>
   );
