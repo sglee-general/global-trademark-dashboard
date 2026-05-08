@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import Papa from "papaparse";
+import countries from "i18n-iso-countries";
+import koLocale from "i18n-iso-countries/langs/ko.json";
 import {
   ComposableMap,
   Geographies,
   Geography,
   ZoomableGroup
 } from "react-simple-maps";
+
+countries.registerLocale(koLocale);
 
 const geoUrl =
   "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson";
@@ -55,7 +59,6 @@ export default function Home() {
 
   const filteredData = useMemo(() => {
     if (selectedBrand === "전체") return data;
-
     return data.filter((item) => item.BRAND === selectedBrand);
   }, [data, selectedBrand]);
 
@@ -106,7 +109,9 @@ export default function Home() {
   };
 
   const getStatusLabel = (status) => {
-    switch (status) {
+    const normalized = String(status || "").toLowerCase();
+
+    switch (normalized) {
       case "green":
         return "등록 완료";
       case "blue":
@@ -121,14 +126,31 @@ export default function Home() {
   };
 
   const getGeoCountryName = (geo) => {
+    const iso3 = geo?.id;
+
+    if (iso3 && iso3 !== "-99") {
+      const koreanName = countries.getName(iso3, "ko");
+      if (koreanName) return koreanName;
+    }
+
     return (
       geo?.properties?.name ||
       geo?.properties?.NAME ||
       geo?.properties?.admin ||
       geo?.properties?.ADMIN ||
-      geo?.id ||
       "국가명 확인 필요"
     );
+  };
+
+  const cardLabelStyle = {
+    minWidth: "72px",
+    fontWeight: "700",
+    color: "#0F172A"
+  };
+
+  const cardValueStyle = {
+    color: "#334155",
+    fontWeight: "500"
   };
 
   return (
@@ -293,7 +315,7 @@ export default function Home() {
           {selectedCountry && (
             <div
               style={{
-                width: "380px",
+                width: "420px",
                 background: "white",
                 borderRadius: "24px",
                 padding: "20px",
@@ -379,7 +401,7 @@ export default function Home() {
                       <div
                         key={idx}
                         style={{
-                          padding: "12px",
+                          padding: "14px",
                           borderRadius: "14px",
                           background: "#F8FAFC",
                           marginBottom: "10px"
@@ -388,25 +410,59 @@ export default function Home() {
                         <div
                           style={{
                             fontWeight: "700",
-                            fontSize: "15px",
-                            marginBottom: "4px"
+                            fontSize: "16px",
+                            marginBottom: "10px",
+                            color: "#0F172A"
                           }}
                         >
                           {row.BRAND}
                         </div>
 
-                        <div>{row.CLASS}</div>
-
-                        <div>{row.TYPE}</div>
+                        <div
+                          style={{
+                            display: "flex",
+                            marginBottom: "6px"
+                          }}
+                        >
+                          <div style={cardLabelStyle}>상품류</div>
+                          <div style={cardValueStyle}>
+                            : {row.CLASS || "-"}
+                          </div>
+                        </div>
 
                         <div
                           style={{
-                            marginTop: "6px",
-                            color: "#334155",
-                            fontWeight: "500"
+                            display: "flex",
+                            marginBottom: "6px"
                           }}
                         >
-                          {row.DETAILS}
+                          <div style={cardLabelStyle}>출원내용</div>
+                          <div style={cardValueStyle}>
+                            : {row.TYPE || "-"}
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            marginBottom: "6px"
+                          }}
+                        >
+                          <div style={cardLabelStyle}>상세내용</div>
+                          <div style={cardValueStyle}>
+                            : {row.DETAILS || "-"}
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex"
+                          }}
+                        >
+                          <div style={cardLabelStyle}>상태</div>
+                          <div style={cardValueStyle}>
+                            : {getStatusLabel(row.STATUS)}
+                          </div>
                         </div>
                       </div>
                     ))}
