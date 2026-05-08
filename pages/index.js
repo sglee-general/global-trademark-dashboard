@@ -15,9 +15,12 @@ const CSV_URL =
 
 export default function Home() {
   const [data, setData] = useState([]);
-  const [brands, setBrands] = useState([]);
+
+  const [brands, setBrands] =
+    useState([]);
+
   const [selectedBrand, setSelectedBrand] =
-    useState("");
+    useState("전체");
 
   const [selectedCountry, setSelectedCountry] =
     useState(null);
@@ -32,21 +35,28 @@ export default function Home() {
       download: true,
       header: true,
       skipEmptyLines: true,
+
       complete: (results) => {
         const cleaned = results.data.map(
           (item) => ({
             BRAND:
               item.BRAND?.trim() || "",
+
             COUNTRY:
               item.COUNTRY?.trim() || "",
+
             CODE:
               item.CODE?.trim() || "",
+
             CLASS:
               item.CLASS?.trim() || "",
+
             TYPE:
               item.TYPE?.trim() || "",
+
             STATUS:
               item.STATUS?.trim() || "",
+
             DETAILS:
               item.DETAILS?.trim() || ""
           })
@@ -54,26 +64,21 @@ export default function Home() {
 
         setData(cleaned);
 
-        const uniqueBrands = [
-          ...new Set(
-            cleaned.map(
-              (item) => item.BRAND
-            )
-          )
-        ].filter(Boolean);
-
-        setBrands(uniqueBrands);
-
-        if (uniqueBrands.length > 0) {
-          setSelectedBrand(
-            uniqueBrands[0]
-          );
-        }
+        setBrands([
+          "전체",
+          "넘버즈인",
+          "퓌",
+          "노크",
+          "테이지"
+        ]);
       }
     });
   }, []);
 
   const filteredData = useMemo(() => {
+    if (selectedBrand === "전체")
+      return data;
+
     return data.filter(
       (item) =>
         item.BRAND === selectedBrand
@@ -91,6 +96,11 @@ export default function Home() {
     const statuses = rows.map((r) =>
       r.STATUS.toLowerCase()
     );
+
+    /**
+     * 우선순위
+     * 등록 > 출원 > 이의 > 거절
+     */
 
     let finalStatus = "red";
 
@@ -117,9 +127,6 @@ export default function Home() {
     return {
       COUNTRY:
         rows[0].COUNTRY,
-
-      BRAND:
-        selectedBrand,
 
       STATUS:
         finalStatus,
@@ -201,91 +208,142 @@ export default function Home() {
       style={{
         fontFamily:
           "Pretendard, Malgun Gothic, sans-serif",
+
         background:
           "#F8FAFC",
+
         minHeight: "100vh",
-        padding: "20px"
+
+        padding: "24px"
       }}
     >
+      {/* 제목 */}
       <h1
         style={{
-          fontSize: "34px",
+          fontSize: "36px",
+
           fontWeight: "700",
-          marginBottom:
-            "20px"
+
+          marginBottom: "24px"
         }}
       >
         비나우 글로벌 상표권 등록 현황
       </h1>
 
+      {/* 브랜드 버튼 */}
       <div
         style={{
-          marginBottom:
-            "20px"
+          display: "flex",
+
+          flexWrap: "wrap",
+
+          gap: "12px",
+
+          marginBottom: "20px"
         }}
       >
-        <select
-          value={
-            selectedBrand
-          }
-          onChange={(e) =>
-            setSelectedBrand(
-              e.target.value
-            )
-          }
-          style={{
-            padding:
-              "12px 16px",
-            borderRadius:
-              "12px",
-            border:
-              "1px solid #CBD5E1",
-            background:
-              "white",
-            fontSize:
-              "16px",
-            minWidth:
-              "240px"
-          }}
-        >
-          {brands.map(
-            (brand) => (
-              <option
-                key={brand}
-                value={brand}
-              >
-                {brand}
-              </option>
-            )
-          )}
-        </select>
+        {brands.map((brand) => (
+          <button
+            key={brand}
+            onClick={() => {
+              setSelectedBrand(
+                brand
+              );
+
+              setSelectedCountry(
+                null
+              );
+            }}
+            style={{
+              padding:
+                "10px 18px",
+
+              borderRadius:
+                "999px",
+
+              border:
+                selectedBrand === brand
+                  ? "none"
+                  : "1px solid #CBD5E1",
+
+              background:
+                selectedBrand === brand
+                  ? "#111827"
+                  : "white",
+
+              color:
+                selectedBrand === brand
+                  ? "white"
+                  : "#111827",
+
+              fontWeight: "600",
+
+              cursor: "pointer",
+
+              transition:
+                "all 0.2s"
+            }}
+          >
+            {brand}
+          </button>
+        ))}
+      </div>
+
+      {/* 범례 */}
+      <div
+        style={{
+          display: "flex",
+
+          flexWrap: "wrap",
+
+          gap: "18px",
+
+          marginBottom: "20px",
+
+          fontSize: "14px",
+
+          fontWeight: "500"
+        }}
+      >
+        <div>🟩 등록 완료</div>
+        <div>🟦 출원 진행</div>
+        <div>🟨 이의신청</div>
+        <div>🟥 거절/분쟁</div>
+        <div>⬜ 정보 없음</div>
       </div>
 
       <div
         style={{
           display: "flex",
+
           gap: "20px"
         }}
       >
+        {/* 지도 */}
         <div
           style={{
             flex: 1,
+
             background:
               "white",
+
             borderRadius:
               "24px",
-            padding: "10px",
+
+            padding: "12px",
+
             boxShadow:
               "0 4px 24px rgba(0,0,0,0.08)"
           }}
         >
           <ComposableMap
             projectionConfig={{
-              scale: 135
+              scale: 125
             }}
             style={{
               width: "100%",
-              height: "75vh"
+
+              height: "70vh"
             }}
           >
             <ZoomableGroup
@@ -343,15 +401,19 @@ export default function Home() {
                                   outline:
                                     "none"
                                 },
+
                               hover:
                                 {
                                   fill:
                                     "#111827",
+
                                   outline:
                                     "none",
+
                                   cursor:
                                     "pointer"
                                 },
+
                               pressed:
                                 {
                                   outline:
@@ -362,6 +424,7 @@ export default function Home() {
                               setSelectedCountry(
                                 {
                                   geo,
+
                                   data:
                                     countryData
                                 }
@@ -377,32 +440,45 @@ export default function Home() {
           </ComposableMap>
         </div>
 
+        {/* 우측 정보 패널 */}
         {selectedCountry && (
           <div
             style={{
               width: "380px",
+
               background:
                 "white",
+
               borderRadius:
                 "24px",
+
               padding: "20px",
+
               boxShadow:
                 "0 4px 24px rgba(0,0,0,0.08)",
-              height: "75vh",
+
+              height: "70vh",
+
               overflow:
                 "hidden",
+
               display: "flex",
+
               flexDirection:
                 "column"
             }}
           >
+            {/* 헤더 */}
             <div
               style={{
                 display: "flex",
+
                 justifyContent:
                   "space-between",
+
                 alignItems:
                   "center",
+
                 marginBottom:
                   "16px"
               }}
@@ -427,12 +503,16 @@ export default function Home() {
                 }
                 style={{
                   border: "none",
+
                   background:
                     "#E2E8F0",
+
                   borderRadius:
                     "8px",
+
                   padding:
                     "6px 10px",
+
                   cursor:
                     "pointer"
                 }}
@@ -441,78 +521,87 @@ export default function Home() {
               </button>
             </div>
 
+            {/* 요약 */}
             {selectedCountry
               .data ? (
               <>
                 <div
                   style={{
                     marginBottom:
-                      "12px"
-                  }}
-                >
-                  현재 상태:
-                  {" "}
-                  <strong>
-                    {getStatusLabel(
-                      selectedCountry
-                        .data
-                        .STATUS
-                    )}
-                  </strong>
-                </div>
-
-                <div
-                  style={{
-                    marginBottom:
                       "16px",
+
                     lineHeight:
                       1.8
                   }}
                 >
-                  🟩 등록:
-                  {" "}
-                  {
-                    selectedCountry
-                      .data
-                      .GREEN_COUNT
-                  }
-                  건
-                  <br />
-                  🟦 출원:
-                  {" "}
-                  {
-                    selectedCountry
-                      .data
-                      .BLUE_COUNT
-                  }
-                  건
-                  <br />
-                  🟨 이의:
-                  {" "}
-                  {
-                    selectedCountry
-                      .data
-                      .YELLOW_COUNT
-                  }
-                  건
-                  <br />
-                  🟥 거절:
-                  {" "}
-                  {
-                    selectedCountry
-                      .data
-                      .RED_COUNT
-                  }
-                  건
+                  <div>
+                    현재 상태:
+                    {" "}
+                    <strong>
+                      {getStatusLabel(
+                        selectedCountry
+                          .data
+                          .STATUS
+                      )}
+                    </strong>
+                  </div>
+
+                  <div>
+                    🟩 등록:
+                    {" "}
+                    {
+                      selectedCountry
+                        .data
+                        .GREEN_COUNT
+                    }
+                    건
+                  </div>
+
+                  <div>
+                    🟦 출원:
+                    {" "}
+                    {
+                      selectedCountry
+                        .data
+                        .BLUE_COUNT
+                    }
+                    건
+                  </div>
+
+                  <div>
+                    🟨 이의:
+                    {" "}
+                    {
+                      selectedCountry
+                        .data
+                        .YELLOW_COUNT
+                    }
+                    건
+                  </div>
+
+                  <div>
+                    🟥 거절:
+                    {" "}
+                    {
+                      selectedCountry
+                        .data
+                        .RED_COUNT
+                    }
+                    건
+                  </div>
                 </div>
 
+                {/* 상세 리스트 */}
                 <div
                   style={{
                     flex: 1,
+
                     overflowY:
                       "auto",
+
                     borderTop:
                       "1px solid #E2E8F0",
+
                     paddingTop:
                       "12px"
                   }}
@@ -528,21 +617,39 @@ export default function Home() {
                         }
                         style={{
                           padding:
-                            "10px",
-                          borderRadius:
                             "12px",
+
+                          borderRadius:
+                            "14px",
+
                           background:
                             "#F8FAFC",
+
                           marginBottom:
                             "10px"
                         }}
                       >
+                        <div
+                          style={{
+                            fontWeight:
+                              "700",
+
+                            fontSize:
+                              "15px",
+
+                            marginBottom:
+                              "4px"
+                          }}
+                        >
+                          {
+                            row.BRAND
+                          }
+                        </div>
+
                         <div>
-                          <strong>
-                            {
-                              row.CLASS
-                            }
-                          </strong>
+                          {
+                            row.CLASS
+                          }
                         </div>
 
                         <div>
@@ -551,17 +658,20 @@ export default function Home() {
                           }
                         </div>
 
-                        <div>
+                        <div
+                          style={{
+                            marginTop:
+                              "6px",
+
+                            color:
+                              "#334155",
+
+                            fontWeight:
+                              "500"
+                          }}
+                        >
                           {
                             row.DETAILS
-                          }
-                        </div>
-
-                        <div>
-                          상태:
-                          {" "}
-                          {
-                            row.STATUS
                           }
                         </div>
                       </div>
