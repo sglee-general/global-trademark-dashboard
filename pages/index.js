@@ -116,8 +116,19 @@ export default function Home() {
       case "red":
         return "거절/분쟁";
       default:
-        return "정보 없음";
+        return "출원 정보 없음";
     }
+  };
+
+  const getGeoCountryName = (geo) => {
+    return (
+      geo?.properties?.name ||
+      geo?.properties?.NAME ||
+      geo?.properties?.admin ||
+      geo?.properties?.ADMIN ||
+      geo?.id ||
+      "국가명 확인 필요"
+    );
   };
 
   return (
@@ -202,7 +213,7 @@ export default function Home() {
           <div>🟦 출원 진행</div>
           <div>🟨 이의신청</div>
           <div>🟥 거절/분쟁</div>
-          <div>⬜ 정보 없음</div>
+          <div>⬜ 출원 정보 없음</div>
         </div>
 
         <div
@@ -306,7 +317,8 @@ export default function Home() {
                     margin: 0
                   }}
                 >
-                  {selectedCountry.data?.COUNTRY || "정보 없음"}
+                  {selectedCountry.data?.COUNTRY ||
+                    getGeoCountryName(selectedCountry.geo)}
                 </h2>
 
                 <button
@@ -401,7 +413,37 @@ export default function Home() {
                   </div>
                 </>
               ) : (
-                <div>정보 없음</div>
+                <div
+                  style={{
+                    borderTop: "1px solid #E2E8F0",
+                    paddingTop: "20px",
+                    lineHeight: 1.8,
+                    color: "#334155"
+                  }}
+                >
+                  <div>
+                    현재 상태: <strong>출원 정보 없음</strong>
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      color: "#64748B"
+                    }}
+                  >
+                    아직 해당 국가에 등록/출원 데이터가 없습니다.
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      color: "#64748B"
+                    }}
+                  >
+                    해외 진출 또는 판매 예정 국가라면 상표 출원 필요 여부를
+                    검토할 수 있습니다.
+                  </div>
+                </div>
               )}
             </div>
           )}
