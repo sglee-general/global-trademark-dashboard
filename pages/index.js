@@ -12,21 +12,130 @@ import {
 countries.registerLocale(koLocale);
 
 const geoUrl =
-  "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson";
+  "https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json";
 
 const CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vTv9Nf_RdMQwHDRRk1L1PrL6LsBV1hfhjUsZ9MhIV1LPWLOAmmb8BwI-eIavV01nrJORaE0U5Tv4g_b/pub?output=csv";
 
+const FIXED_BRANDS = ["전체", "넘버즈인", "퓌", "노크", "테이지"];
+
+const INITIAL_MAP_POSITION = {
+  coordinates: [10, 15],
+  zoom: 1
+};
+
+function normalizeText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[\s·.,()]/g, "")
+    .trim();
+}
+
+function getFinalStatus(rows) {
+  if (!rows || rows.length === 0) return "unknown";
+
+  const statuses = rows.map((row) => String(row.STATUS || "").toLowerCase());
+
+  if (statuses.some((status) => status.includes("green"))) {
+    return "green";
+  }
+
+  if (statuses.some((status) => status.includes("blue"))) {
+    return "blue";
+  }
+
+  if (statuses.some((status) => status.includes("yellow"))) {
+    return "yellow";
+  }
+
+  if (statuses.some((status) => status.includes("red"))) {
+    return "red";
+  }
+
+  return "unknown";
+}
+
+function getStatusLabel(status) {
+  const normalized = String(status || "").toLowerCase();
+
+  switch (normalized) {
+    case "green":
+      return "등록 완료";
+    case "blue":
+      return "출원 진행";
+    case "yellow":
+      return "이의신청";
+    case "red":
+      return "거절/분쟁";
+    default:
+      return "출원 정보 없음";
+  }
+}
+
+function getColor(country) {
+  if (!country) return "#D1D5DB";
+
+  switch (country.STATUS) {
+    case "green":
+      return "#22C55E";
+    case "blue":
+      return "#3B82F6";
+    case "yellow":
+      return "#FACC15";
+    case "red":
+      return "#EF4444";
+    default:
+      return "#D1D5DB";
+  }
+}
+
+function collectCoordinates(coords, points) {
+  if (!coords) return;
+
+  if (
+    Array.isArray(coords) &&
+    typeof coords[0] === "number" &&
+    typeof coords[1] === "number"
+  ) {
+    points.push(coords);
+    return;
+  }
+
+  if (Array.isArray(coords)) {
+    coords.forEach((child) => collectCoordinates(child, points));
+  }
+}
+
+function getFeatureCenter(geo) {
+  const points = [];
+
+  collectCoordinates(geo?.geometry?.coordinates, points);
+
+  if (points.length === 0) {
+    return INITIAL_MAP_POSITION.coordinates;
+  }
+
+  const lngs = points.map((point) => point[0]);
+  const lats = points.map((point) => point[1]);
+
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+
+  return [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
+}
+
 export default function Home() {
   const [data, setData] = useState([]);
-  const [brands, setBrands] = useState([]);
+  const [brands, setBrands] = useState(FIXED_BRANDS);
   const [selectedBrand, setSelectedBrand] = useState("전체");
   const [selectedCountry, setSelectedCountry] = useState(null);
+  const [allCountries, setAllCountries] = useState([]);
+  const [searchText, setSearchText] = useState("");
+  const [searchMessage, setSearchMessage] = useState("");
 
-  const [position, setPosition] = useState({
-    coordinates: [10, 15],
-    zoom: 1
-  });
+  const [position, setPosition] = useState(INITIAL_MAP_POSITION);
 
   useEffect(() => {
     Papa.parse(CSV_URL, {
@@ -45,20 +154,29 @@ export default function Home() {
         }));
 
         setData(cleaned);
-
-        setBrands([
-          "전체",
-          "넘버즈인",
-          "퓌",
-          "노크",
-          "테이지"
-        ]);
+        setBrands(FIXED_BRANDS);
       }
     });
   }, []);
 
+  useEffect(() => {
+    fetch(geoUrl)
+      .then((res) => res.json())
+      .then((geoJson) => {
+        const features = (geoJson.features || []).filter(
+          (geo) => geo.id && geo.id !== "ATA"
+        );
+
+        setAllCountries(features);
+      })
+      .catch(() => {
+        setAllCountries([]);
+      });
+  }, []);
+
   const filteredData = useMemo(() => {
     if (selectedBrand === "전체") return data;
+
     return data.filter((item) => item.BRAND === selectedBrand);
   }, [data, selectedBrand]);
 
@@ -67,68 +185,28 @@ export default function Home() {
 
     if (rows.length === 0) return null;
 
-    const statuses = rows.map((r) => r.STATUS.toLowerCase());
-
-    let finalStatus = "red";
-
-    if (statuses.some((s) => s.includes("green"))) {
-      finalStatus = "green";
-    } else if (statuses.some((s) => s.includes("blue"))) {
-      finalStatus = "blue";
-    } else if (statuses.some((s) => s.includes("yellow"))) {
-      finalStatus = "yellow";
-    }
+    const statuses = rows.map((row) =>
+      String(row.STATUS || "").toLowerCase()
+    );
 
     return {
       COUNTRY: rows[0].COUNTRY,
-      STATUS: finalStatus,
-      GREEN_COUNT: statuses.filter((s) => s.includes("green")).length,
-      BLUE_COUNT: statuses.filter((s) => s.includes("blue")).length,
-      RED_COUNT: statuses.filter((s) => s.includes("red")).length,
-      YELLOW_COUNT: statuses.filter((s) => s.includes("yellow")).length,
+      STATUS: getFinalStatus(rows),
+      GREEN_COUNT: statuses.filter((status) => status.includes("green"))
+        .length,
+      BLUE_COUNT: statuses.filter((status) => status.includes("blue")).length,
+      RED_COUNT: statuses.filter((status) => status.includes("red")).length,
+      YELLOW_COUNT: statuses.filter((status) => status.includes("yellow"))
+        .length,
       TOTAL_COUNT: rows.length,
       ROWS: rows
     };
   };
 
-  const getColor = (country) => {
-    if (!country) return "#D1D5DB";
-
-    switch (country.STATUS) {
-      case "green":
-        return "#22C55E";
-      case "blue":
-        return "#3B82F6";
-      case "yellow":
-        return "#FACC15";
-      case "red":
-        return "#EF4444";
-      default:
-        return "#D1D5DB";
-    }
-  };
-
-  const getStatusLabel = (status) => {
-    const normalized = String(status || "").toLowerCase();
-
-    switch (normalized) {
-      case "green":
-        return "등록 완료";
-      case "blue":
-        return "출원 진행";
-      case "yellow":
-        return "이의신청";
-      case "red":
-        return "거절/분쟁";
-      default:
-        return "출원 정보 없음";
-    }
-  };
-
   const getGeoCountryName = (geo) => {
     const iso3 = geo?.id;
 
-    if (iso3 && iso3 !== "-99") {
+    if (iso3) {
       const koreanName = countries.getName(iso3, "ko");
       if (koreanName) return koreanName;
     }
@@ -138,12 +216,157 @@ export default function Home() {
       geo?.properties?.NAME ||
       geo?.properties?.admin ||
       geo?.properties?.ADMIN ||
+      iso3 ||
       "국가명 확인 필요"
     );
   };
 
+  const getDisplayCountryName = (geo, countryData) => {
+    if (countryData?.COUNTRY) return countryData.COUNTRY;
+
+    const iso3 = geo?.id;
+
+    const sheetCountryName = data.find(
+      (item) => item.CODE === iso3 && item.COUNTRY
+    )?.COUNTRY;
+
+    if (sheetCountryName) return sheetCountryName;
+
+    return getGeoCountryName(geo);
+  };
+
+  const stats = useMemo(() => {
+    const groupedByCountry = {};
+
+    filteredData.forEach((row) => {
+      if (!row.CODE) return;
+
+      if (!groupedByCountry[row.CODE]) {
+        groupedByCountry[row.CODE] = [];
+      }
+
+      groupedByCountry[row.CODE].push(row);
+    });
+
+    const countryStatuses = Object.values(groupedByCountry).map((rows) =>
+      getFinalStatus(rows)
+    );
+
+    const totalManagedCountries = Object.keys(groupedByCountry).length;
+
+    const noDataCountries =
+      allCountries.length > 0
+        ? Math.max(allCountries.length - totalManagedCountries, 0)
+        : 0;
+
+    return {
+      totalRows: filteredData.length,
+      totalManagedCountries,
+      greenCountries: countryStatuses.filter((status) => status === "green")
+        .length,
+      blueCountries: countryStatuses.filter((status) => status === "blue")
+        .length,
+      yellowCountries: countryStatuses.filter((status) => status === "yellow")
+        .length,
+      redCountries: countryStatuses.filter((status) => status === "red")
+        .length,
+      noDataCountries
+    };
+  }, [filteredData, allCountries]);
+
+  const handleCountrySelect = (geo) => {
+    const iso3 = geo.id;
+    const countryData = getCountryData(iso3);
+    const countryName = getDisplayCountryName(geo, countryData);
+
+    setSelectedCountry({
+      geo,
+      data: countryData,
+      countryName
+    });
+
+    setSearchMessage("");
+  };
+
+  const handleSearch = (event) => {
+    event.preventDefault();
+
+    const query = normalizeText(searchText);
+
+    if (!query) {
+      setSearchMessage("검색할 국가명을 입력해 주세요.");
+      return;
+    }
+
+    if (allCountries.length === 0) {
+      setSearchMessage("국가 데이터를 불러오는 중입니다. 잠시 후 다시 검색해 주세요.");
+      return;
+    }
+
+    const candidates = allCountries.map((geo) => {
+      const iso3 = geo.id;
+
+      const koreanName = countries.getName(iso3, "ko") || "";
+      const englishName =
+        geo?.properties?.name ||
+        geo?.properties?.NAME ||
+        geo?.properties?.admin ||
+        geo?.properties?.ADMIN ||
+        "";
+
+      const sheetCountryName =
+        data.find((item) => item.CODE === iso3 && item.COUNTRY)?.COUNTRY || "";
+
+      return {
+        geo,
+        iso3,
+        names: [iso3, koreanName, englishName, sheetCountryName].filter(
+          Boolean
+        )
+      };
+    });
+
+    const exactMatch = candidates.find((candidate) =>
+      candidate.names.some((name) => normalizeText(name) === query)
+    );
+
+    const partialMatch =
+      exactMatch ||
+      candidates.find((candidate) =>
+        candidate.names.some((name) => normalizeText(name).includes(query))
+      );
+
+    if (!partialMatch) {
+      setSearchMessage("검색 결과가 없습니다. 국가명 또는 ISO 코드를 확인해 주세요.");
+      return;
+    }
+
+    const countryData = getCountryData(partialMatch.iso3);
+    const countryName = getDisplayCountryName(partialMatch.geo, countryData);
+
+    setSelectedCountry({
+      geo: partialMatch.geo,
+      data: countryData,
+      countryName
+    });
+
+    setPosition({
+      coordinates: getFeatureCenter(partialMatch.geo),
+      zoom: 2.2
+    });
+
+    setSearchMessage(`${countryName} 정보를 표시했습니다.`);
+  };
+
+  const resetMap = () => {
+    setPosition(INITIAL_MAP_POSITION);
+    setSelectedCountry(null);
+    setSearchText("");
+    setSearchMessage("");
+  };
+
   const cardLabelStyle = {
-    minWidth: "72px",
+    minWidth: "76px",
     fontWeight: "700",
     color: "#0F172A"
   };
@@ -152,6 +375,39 @@ export default function Home() {
     color: "#334155",
     fontWeight: "500"
   };
+
+  const statCards = [
+    {
+      title: "관리 국가",
+      value: `${stats.totalManagedCountries}개국`,
+      description: `총 ${stats.totalRows}건`
+    },
+    {
+      title: "등록 완료",
+      value: `${stats.greenCountries}개국`,
+      description: "권리 확보"
+    },
+    {
+      title: "출원 진행",
+      value: `${stats.blueCountries}개국`,
+      description: "진행 중"
+    },
+    {
+      title: "이의신청",
+      value: `${stats.yellowCountries}개국`,
+      description: "확인 필요"
+    },
+    {
+      title: "거절/분쟁",
+      value: `${stats.redCountries}개국`,
+      description: "리스크 검토"
+    },
+    {
+      title: "출원 정보 없음",
+      value: `${stats.noDataCountries}개국`,
+      description: "미진행 후보"
+    }
+  ];
 
   return (
     <div
@@ -185,7 +441,7 @@ export default function Home() {
             justifyContent: "center",
             flexWrap: "wrap",
             gap: "12px",
-            marginBottom: "20px"
+            marginBottom: "18px"
           }}
         >
           {brands.map((brand) => (
@@ -194,22 +450,15 @@ export default function Home() {
               onClick={() => {
                 setSelectedBrand(brand);
                 setSelectedCountry(null);
+                setSearchMessage("");
               }}
               style={{
                 padding: "10px 18px",
                 borderRadius: "999px",
                 border:
-                  selectedBrand === brand
-                    ? "none"
-                    : "1px solid #CBD5E1",
-                background:
-                  selectedBrand === brand
-                    ? "#111827"
-                    : "white",
-                color:
-                  selectedBrand === brand
-                    ? "white"
-                    : "#111827",
+                  selectedBrand === brand ? "none" : "1px solid #CBD5E1",
+                background: selectedBrand === brand ? "#111827" : "white",
+                color: selectedBrand === brand ? "white" : "#111827",
                 fontWeight: "600",
                 cursor: "pointer",
                 transition: "all 0.2s ease"
@@ -220,13 +469,84 @@ export default function Home() {
           ))}
         </div>
 
+        <form
+          onSubmit={handleSearch}
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            flexWrap: "wrap",
+            gap: "10px",
+            marginBottom: "10px"
+          }}
+        >
+          <input
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            placeholder="국가명 또는 ISO 코드 검색 예: 미국, 일본, USA, JPN"
+            style={{
+              width: "420px",
+              maxWidth: "100%",
+              padding: "12px 14px",
+              borderRadius: "12px",
+              border: "1px solid #CBD5E1",
+              fontSize: "15px",
+              outline: "none",
+              background: "white"
+            }}
+          />
+
+          <button
+            type="submit"
+            style={{
+              padding: "12px 18px",
+              borderRadius: "12px",
+              border: "none",
+              background: "#111827",
+              color: "white",
+              fontWeight: "700",
+              cursor: "pointer"
+            }}
+          >
+            검색
+          </button>
+
+          <button
+            type="button"
+            onClick={resetMap}
+            style={{
+              padding: "12px 18px",
+              borderRadius: "12px",
+              border: "1px solid #CBD5E1",
+              background: "white",
+              color: "#111827",
+              fontWeight: "700",
+              cursor: "pointer"
+            }}
+          >
+            초기화
+          </button>
+        </form>
+
+        {searchMessage && (
+          <div
+            style={{
+              textAlign: "center",
+              color: "#475569",
+              fontSize: "14px",
+              marginBottom: "14px"
+            }}
+          >
+            {searchMessage}
+          </div>
+        )}
+
         <div
           style={{
             display: "flex",
             justifyContent: "center",
             flexWrap: "wrap",
             gap: "18px",
-            marginBottom: "20px",
+            marginBottom: "18px",
             fontSize: "14px",
             fontWeight: "500"
           }}
@@ -236,6 +556,59 @@ export default function Home() {
           <div>🟨 이의신청</div>
           <div>🟥 거절/분쟁</div>
           <div>⬜ 출원 정보 없음</div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: "12px",
+            marginBottom: "20px"
+          }}
+        >
+          {statCards.map((card) => (
+            <div
+              key={card.title}
+              style={{
+                background: "white",
+                borderRadius: "18px",
+                padding: "16px",
+                boxShadow: "0 4px 18px rgba(0,0,0,0.06)",
+                border: "1px solid #E2E8F0"
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: "#64748B",
+                  fontWeight: "700",
+                  marginBottom: "8px"
+                }}
+              >
+                {card.title}
+              </div>
+
+              <div
+                style={{
+                  fontSize: "24px",
+                  fontWeight: "800",
+                  color: "#0F172A",
+                  marginBottom: "4px"
+                }}
+              >
+                {card.value}
+              </div>
+
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: "#64748B"
+                }}
+              >
+                {card.description}
+              </div>
+            </div>
+          ))}
         </div>
 
         <div
@@ -260,7 +633,7 @@ export default function Home() {
               }}
               style={{
                 width: "100%",
-                height: "70vh"
+                height: "68vh"
               }}
             >
               <ZoomableGroup
@@ -271,7 +644,7 @@ export default function Home() {
                 <Geographies geography={geoUrl}>
                   {({ geographies }) =>
                     geographies
-                      .filter((geo) => !["ATA"].includes(geo.id))
+                      .filter((geo) => geo.id && geo.id !== "ATA")
                       .map((geo) => {
                         const iso3 = geo.id;
                         const countryData = getCountryData(iso3);
@@ -297,12 +670,7 @@ export default function Home() {
                                 outline: "none"
                               }
                             }}
-                            onClick={() =>
-                              setSelectedCountry({
-                                geo,
-                                data: countryData
-                              })
-                            }
+                            onClick={() => handleCountrySelect(geo)}
                           />
                         );
                       })
@@ -320,7 +688,7 @@ export default function Home() {
                 borderRadius: "24px",
                 padding: "20px",
                 boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-                height: "70vh",
+                height: "68vh",
                 overflow: "hidden",
                 display: "flex",
                 flexDirection: "column"
@@ -339,8 +707,7 @@ export default function Home() {
                     margin: 0
                   }}
                 >
-                  {selectedCountry.data?.COUNTRY ||
-                    getGeoCountryName(selectedCountry.geo)}
+                  {selectedCountry.countryName}
                 </h2>
 
                 <button
@@ -372,21 +739,10 @@ export default function Home() {
                       </strong>
                     </div>
 
-                    <div>
-                      🟩 등록: {selectedCountry.data.GREEN_COUNT}건
-                    </div>
-
-                    <div>
-                      🟦 출원: {selectedCountry.data.BLUE_COUNT}건
-                    </div>
-
-                    <div>
-                      🟨 이의: {selectedCountry.data.YELLOW_COUNT}건
-                    </div>
-
-                    <div>
-                      🟥 거절: {selectedCountry.data.RED_COUNT}건
-                    </div>
+                    <div>🟩 등록: {selectedCountry.data.GREEN_COUNT}건</div>
+                    <div>🟦 출원: {selectedCountry.data.BLUE_COUNT}건</div>
+                    <div>🟨 이의: {selectedCountry.data.YELLOW_COUNT}건</div>
+                    <div>🟥 거절: {selectedCountry.data.RED_COUNT}건</div>
                   </div>
 
                   <div
@@ -425,9 +781,7 @@ export default function Home() {
                           }}
                         >
                           <div style={cardLabelStyle}>상품류</div>
-                          <div style={cardValueStyle}>
-                            : {row.CLASS || "-"}
-                          </div>
+                          <div style={cardValueStyle}>: {row.CLASS || "-"}</div>
                         </div>
 
                         <div
@@ -437,21 +791,7 @@ export default function Home() {
                           }}
                         >
                           <div style={cardLabelStyle}>출원내용</div>
-                          <div style={cardValueStyle}>
-                            : {row.TYPE || "-"}
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            display: "flex",
-                            marginBottom: "6px"
-                          }}
-                        >
-                          <div style={cardLabelStyle}>상세내용</div>
-                          <div style={cardValueStyle}>
-                            : {row.DETAILS || "-"}
-                          </div>
+                          <div style={cardValueStyle}>: {row.TYPE || "-"}</div>
                         </div>
 
                         <div
