@@ -173,6 +173,7 @@ export default function Home() {
   const [searchText, setSearchText] = useState("");
   const [searchMessage, setSearchMessage] = useState("");
   const [searchedCountryIso, setSearchedCountryIso] = useState(null);
+  const [activeStatFilter, setActiveStatFilter] = useState(null);
 
   const [position, setPosition] = useState(INITIAL_MAP_POSITION);
 
@@ -274,6 +275,42 @@ export default function Home() {
     return getGeoCountryName(geo);
   };
 
+  const countrySummaries = useMemo(() => {
+    return allCountries.map((geo) => {
+      const iso3 = geo.id;
+      const rows = filteredData.filter((item) => item.CODE === iso3);
+      const countryData =
+        rows.length > 0
+          ? {
+              COUNTRY: rows[0].COUNTRY,
+              STATUS: getFinalStatus(rows),
+              GREEN_COUNT: rows.filter((row) =>
+                String(row.STATUS || "").toLowerCase().includes("green")
+              ).length,
+              BLUE_COUNT: rows.filter((row) =>
+                String(row.STATUS || "").toLowerCase().includes("blue")
+              ).length,
+              RED_COUNT: rows.filter((row) =>
+                String(row.STATUS || "").toLowerCase().includes("red")
+              ).length,
+              YELLOW_COUNT: rows.filter((row) =>
+                String(row.STATUS || "").toLowerCase().includes("yellow")
+              ).length,
+              TOTAL_COUNT: rows.length,
+              ROWS: rows
+            }
+          : null;
+
+      return {
+        geo,
+        iso3,
+        countryName: getDisplayCountryName(geo, countryData),
+        data: countryData,
+        status: countryData?.STATUS || "unknown"
+      };
+    });
+  }, [allCountries, filteredData, data]);
+
   const stats = useMemo(() => {
     const groupedByCountry = {};
 
@@ -326,6 +363,7 @@ export default function Home() {
 
     if (shouldFocus) {
       setSearchedCountryIso(iso3);
+      setActiveStatFilter(null);
       setPosition({
         coordinates: getFeatureCenter(geo),
         zoom: getSearchZoom(geo)
@@ -398,6 +436,7 @@ export default function Home() {
     });
 
     setSearchedCountryIso(partialMatch.iso3);
+    setActiveStatFilter(null);
 
     setPosition({
       coordinates: getFeatureCenter(partialMatch.geo),
@@ -413,7 +452,39 @@ export default function Home() {
     setSearchText("");
     setSearchMessage("");
     setSearchedCountryIso(null);
+    setActiveStatFilter(null);
   };
+
+  const handleStatCardClick = (filterType, title) => {
+    setActiveStatFilter({
+      type: filterType,
+      title
+    });
+
+    setSelectedCountry(null);
+    setSearchedCountryIso(null);
+    setSearchText("");
+    setSearchMessage(`${title} 국가 목록을 표시했습니다.`);
+    setPosition(INITIAL_MAP_POSITION);
+  };
+
+  const getStatFilteredCountries = () => {
+    if (!activeStatFilter) return [];
+
+    if (activeStatFilter.type === "managed") {
+      return countrySummaries.filter((country) => country.data);
+    }
+
+    if (activeStatFilter.type === "unknown") {
+      return countrySummaries.filter((country) => !country.data);
+    }
+
+    return countrySummaries.filter(
+      (country) => country.status === activeStatFilter.type
+    );
+  };
+
+  const statFilteredCountries = getStatFilteredCountries();
 
   const cardLabelStyle = {
     minWidth: "76px",
@@ -430,32 +501,38 @@ export default function Home() {
     {
       title: "관리 국가",
       value: `${stats.totalManagedCountries}개국`,
-      description: `총 ${stats.totalRows}건`
+      description: `총 ${stats.totalRows}건`,
+      filterType: "managed"
     },
     {
       title: "등록 완료",
       value: `${stats.greenCountries}개국`,
-      description: "권리 확보"
+      description: "권리 확보",
+      filterType: "green"
     },
     {
       title: "출원 진행",
       value: `${stats.blueCountries}개국`,
-      description: "진행 중"
+      description: "진행 중",
+      filterType: "blue"
     },
     {
       title: "이의신청",
       value: `${stats.yellowCountries}개국`,
-      description: "확인 필요"
+      description: "확인 필요",
+      filterType: "yellow"
     },
     {
       title: "거절/분쟁",
       value: `${stats.redCountries}개국`,
-      description: "리스크 검토"
+      description: "리스크 검토",
+      filterType: "red"
     },
     {
       title: "출원 정보 없음",
       value: `${stats.noDataCountries}개국`,
-      description: "미진행 후보"
+      description: "미진행 후보",
+      filterType: "unknown"
     }
   ];
 
@@ -502,6 +579,7 @@ export default function Home() {
                 setSelectedCountry(null);
                 setSearchMessage("");
                 setSearchedCountryIso(null);
+                setActiveStatFilter(null);
               }}
               style={{
                 padding: "10px 18px",
@@ -617,49 +695,58 @@ export default function Home() {
             marginBottom: "20px"
           }}
         >
-          {statCards.map((card) => (
-            <div
-              key={card.title}
-              style={{
-                background: "white",
-                borderRadius: "18px",
-                padding: "16px",
-                boxShadow: "0 4px 18px rgba(0,0,0,0.06)",
-                border: "1px solid #E2E8F0"
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#64748B",
-                  fontWeight: "700",
-                  marginBottom: "8px"
-                }}
-              >
-                {card.title}
-              </div>
+          {statCards.map((card) => {
+            const isActive = activeStatFilter?.type === card.filterType;
 
-              <div
+            return (
+              <button
+                key={card.title}
+                type="button"
+                onClick={() => handleStatCardClick(card.filterType, card.title)}
                 style={{
-                  fontSize: "24px",
-                  fontWeight: "800",
-                  color: "#0F172A",
-                  marginBottom: "4px"
+                  textAlign: "left",
+                  background: isActive ? "#111827" : "white",
+                  borderRadius: "18px",
+                  padding: "16px",
+                  boxShadow: "0 4px 18px rgba(0,0,0,0.06)",
+                  border: isActive ? "1px solid #111827" : "1px solid #E2E8F0",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease"
                 }}
               >
-                {card.value}
-              </div>
+                <div
+                  style={{
+                    fontSize: "13px",
+                    color: isActive ? "#CBD5E1" : "#64748B",
+                    fontWeight: "700",
+                    marginBottom: "8px"
+                  }}
+                >
+                  {card.title}
+                </div>
 
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#64748B"
-                }}
-              >
-                {card.description}
-              </div>
-            </div>
-          ))}
+                <div
+                  style={{
+                    fontSize: "24px",
+                    fontWeight: "800",
+                    color: isActive ? "white" : "#0F172A",
+                    marginBottom: "4px"
+                  }}
+                >
+                  {card.value}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "13px",
+                    color: isActive ? "#CBD5E1" : "#64748B"
+                  }}
+                >
+                  {card.description}
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         <div
@@ -699,10 +786,25 @@ export default function Home() {
                       .map((geo) => {
                         const iso3 = geo.id;
                         const countryData = getCountryData(iso3);
+                        const countryStatus = countryData?.STATUS || "unknown";
 
                         const isSearchMode = Boolean(searchedCountryIso);
-                        const isFocusedCountry =
-                          searchedCountryIso === geo.id || !isSearchMode;
+                        const isStatFilterMode = Boolean(activeStatFilter);
+
+                        let isFocusedCountry = true;
+
+                        if (isSearchMode) {
+                          isFocusedCountry = searchedCountryIso === geo.id;
+                        } else if (isStatFilterMode) {
+                          if (activeStatFilter.type === "managed") {
+                            isFocusedCountry = Boolean(countryData);
+                          } else if (activeStatFilter.type === "unknown") {
+                            isFocusedCountry = !countryData;
+                          } else {
+                            isFocusedCountry =
+                              countryStatus === activeStatFilter.type;
+                          }
+                        }
 
                         const countryColor = isFocusedCountry
                           ? getColor(countryData)
@@ -717,24 +819,18 @@ export default function Home() {
                             key={geo.rsmKey}
                             geography={geo}
                             fill={countryColor}
-                            stroke={
-                              searchedCountryIso === geo.id
-                                ? "#0F172A"
-                                : "#FFFFFF"
-                            }
-                            strokeWidth={
-                              searchedCountryIso === geo.id ? 1.1 : 0.5
-                            }
+                            stroke="#FFFFFF"
+                            strokeWidth={0.5}
                             style={{
                               default: {
                                 outline: "none",
                                 transition: "all 0.2s ease",
-                                opacity: isFocusedCountry ? 1 : 0.42
+                                opacity: isFocusedCountry ? 1 : 0.35
                               },
                               hover: {
                                 fill: hoverColor,
-                                stroke: "#0F172A",
-                                strokeWidth: 0.9,
+                                stroke: "#FFFFFF",
+                                strokeWidth: 0.5,
                                 outline: "none",
                                 cursor: "pointer",
                                 opacity: 1
@@ -753,7 +849,7 @@ export default function Home() {
             </ComposableMap>
           </div>
 
-          {selectedCountry && (
+          {(selectedCountry || activeStatFilter) && (
             <div
               style={{
                 width: "420px",
@@ -767,55 +863,208 @@ export default function Home() {
                 flexDirection: "column"
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "16px"
-                }}
-              >
-                <h2
-                  style={{
-                    margin: 0
-                  }}
-                >
-                  {selectedCountry.countryName}
-                </h2>
-
-                <button
-                  onClick={() => setSelectedCountry(null)}
-                  style={{
-                    border: "none",
-                    background: "#E2E8F0",
-                    borderRadius: "8px",
-                    padding: "6px 10px",
-                    cursor: "pointer"
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-
-              {selectedCountry.data ? (
+              {selectedCountry ? (
                 <>
                   <div
                     style={{
-                      marginBottom: "16px",
-                      lineHeight: 1.8
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "16px"
                     }}
                   >
-                    <div>
-                      현재 상태:{" "}
-                      <strong>
-                        {getStatusLabel(selectedCountry.data.STATUS)}
-                      </strong>
-                    </div>
+                    <h2
+                      style={{
+                        margin: 0
+                      }}
+                    >
+                      {selectedCountry.countryName}
+                    </h2>
 
-                    <div>🟩 등록: {selectedCountry.data.GREEN_COUNT}건</div>
-                    <div>🟦 출원: {selectedCountry.data.BLUE_COUNT}건</div>
-                    <div>🟨 이의: {selectedCountry.data.YELLOW_COUNT}건</div>
-                    <div>🟥 거절: {selectedCountry.data.RED_COUNT}건</div>
+                    <button
+                      onClick={() => setSelectedCountry(null)}
+                      style={{
+                        border: "none",
+                        background: "#E2E8F0",
+                        borderRadius: "8px",
+                        padding: "6px 10px",
+                        cursor: "pointer"
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {selectedCountry.data ? (
+                    <>
+                      <div
+                        style={{
+                          marginBottom: "16px",
+                          lineHeight: 1.8
+                        }}
+                      >
+                        <div>
+                          현재 상태:{" "}
+                          <strong>
+                            {getStatusLabel(selectedCountry.data.STATUS)}
+                          </strong>
+                        </div>
+
+                        <div>
+                          🟩 등록: {selectedCountry.data.GREEN_COUNT}건
+                        </div>
+                        <div>
+                          🟦 출원: {selectedCountry.data.BLUE_COUNT}건
+                        </div>
+                        <div>
+                          🟨 이의: {selectedCountry.data.YELLOW_COUNT}건
+                        </div>
+                        <div>
+                          🟥 거절: {selectedCountry.data.RED_COUNT}건
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          flex: 1,
+                          overflowY: "auto",
+                          borderTop: "1px solid #E2E8F0",
+                          paddingTop: "12px"
+                        }}
+                      >
+                        {selectedCountry.data.ROWS.map((row, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              padding: "14px",
+                              borderRadius: "14px",
+                              background: "#F8FAFC",
+                              marginBottom: "10px"
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontWeight: "700",
+                                fontSize: "16px",
+                                marginBottom: "10px",
+                                color: "#0F172A"
+                              }}
+                            >
+                              {row.BRAND}
+                            </div>
+
+                            <div
+                              style={{
+                                display: "flex",
+                                marginBottom: "6px"
+                              }}
+                            >
+                              <div style={cardLabelStyle}>상품류</div>
+                              <div style={cardValueStyle}>
+                                : {row.CLASS || "-"}
+                              </div>
+                            </div>
+
+                            <div
+                              style={{
+                                display: "flex",
+                                marginBottom: "6px"
+                              }}
+                            >
+                              <div style={cardLabelStyle}>출원내용</div>
+                              <div style={cardValueStyle}>
+                                : {row.TYPE || "-"}
+                              </div>
+                            </div>
+
+                            <div
+                              style={{
+                                display: "flex"
+                              }}
+                            >
+                              <div style={cardLabelStyle}>상태</div>
+                              <div style={cardValueStyle}>
+                                : {getStatusLabel(row.STATUS)}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div
+                      style={{
+                        borderTop: "1px solid #E2E8F0",
+                        paddingTop: "20px",
+                        lineHeight: 1.8,
+                        color: "#334155"
+                      }}
+                    >
+                      <div>
+                        현재 상태: <strong>출원 정보 없음</strong>
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: "12px",
+                          color: "#64748B"
+                        }}
+                      >
+                        아직 해당 국가에 등록/출원 데이터가 없습니다.
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: "12px",
+                          color: "#64748B"
+                        }}
+                      >
+                        해외 진출 또는 판매 예정 국가라면 상표 출원 필요
+                        여부를 검토할 수 있습니다.
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "16px"
+                    }}
+                  >
+                    <h2
+                      style={{
+                        margin: 0
+                      }}
+                    >
+                      {activeStatFilter.title}
+                    </h2>
+
+                    <button
+                      onClick={() => setActiveStatFilter(null)}
+                      style={{
+                        border: "none",
+                        background: "#E2E8F0",
+                        borderRadius: "8px",
+                        padding: "6px 10px",
+                        cursor: "pointer"
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      color: "#64748B",
+                      marginBottom: "12px",
+                      fontSize: "14px"
+                    }}
+                  >
+                    총 {statFilteredCountries.length}개국
                   </div>
 
                   <div
@@ -826,93 +1075,44 @@ export default function Home() {
                       paddingTop: "12px"
                     }}
                   >
-                    {selectedCountry.data.ROWS.map((row, idx) => (
-                      <div
-                        key={idx}
+                    {statFilteredCountries.map((country) => (
+                      <button
+                        key={country.iso3}
+                        type="button"
+                        onClick={() => handleCountrySelect(country.geo, true)}
                         style={{
-                          padding: "14px",
-                          borderRadius: "14px",
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "12px",
+                          borderRadius: "12px",
+                          border: "1px solid #E2E8F0",
                           background: "#F8FAFC",
-                          marginBottom: "10px"
+                          marginBottom: "8px",
+                          cursor: "pointer"
                         }}
                       >
                         <div
                           style={{
                             fontWeight: "700",
-                            fontSize: "16px",
-                            marginBottom: "10px",
-                            color: "#0F172A"
+                            color: "#0F172A",
+                            marginBottom: "4px"
                           }}
                         >
-                          {row.BRAND}
+                          {country.countryName}
                         </div>
 
                         <div
                           style={{
-                            display: "flex",
-                            marginBottom: "6px"
+                            fontSize: "13px",
+                            color: "#64748B"
                           }}
                         >
-                          <div style={cardLabelStyle}>상품류</div>
-                          <div style={cardValueStyle}>: {row.CLASS || "-"}</div>
+                          {country.iso3} · {getStatusLabel(country.status)}
                         </div>
-
-                        <div
-                          style={{
-                            display: "flex",
-                            marginBottom: "6px"
-                          }}
-                        >
-                          <div style={cardLabelStyle}>출원내용</div>
-                          <div style={cardValueStyle}>: {row.TYPE || "-"}</div>
-                        </div>
-
-                        <div
-                          style={{
-                            display: "flex"
-                          }}
-                        >
-                          <div style={cardLabelStyle}>상태</div>
-                          <div style={cardValueStyle}>
-                            : {getStatusLabel(row.STATUS)}
-                          </div>
-                        </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </>
-              ) : (
-                <div
-                  style={{
-                    borderTop: "1px solid #E2E8F0",
-                    paddingTop: "20px",
-                    lineHeight: 1.8,
-                    color: "#334155"
-                  }}
-                >
-                  <div>
-                    현재 상태: <strong>출원 정보 없음</strong>
-                  </div>
-
-                  <div
-                    style={{
-                      marginTop: "12px",
-                      color: "#64748B"
-                    }}
-                  >
-                    아직 해당 국가에 등록/출원 데이터가 없습니다.
-                  </div>
-
-                  <div
-                    style={{
-                      marginTop: "12px",
-                      color: "#64748B"
-                    }}
-                  >
-                    해외 진출 또는 판매 예정 국가라면 상표 출원 필요 여부를
-                    검토할 수 있습니다.
-                  </div>
-                </div>
               )}
             </div>
           )}
