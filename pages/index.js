@@ -313,7 +313,7 @@ export default function Home() {
     };
   }, [filteredData, allCountries]);
 
-  const handleCountrySelect = (geo) => {
+  const handleCountrySelect = (geo, shouldFocus = false) => {
     const iso3 = geo.id;
     const countryData = getCountryData(iso3);
     const countryName = getDisplayCountryName(geo, countryData);
@@ -323,6 +323,14 @@ export default function Home() {
       data: countryData,
       countryName
     });
+
+    if (shouldFocus) {
+      setSearchedCountryIso(iso3);
+      setPosition({
+        coordinates: getFeatureCenter(geo),
+        zoom: getSearchZoom(geo)
+      });
+    }
 
     setSearchMessage("");
   };
@@ -396,7 +404,7 @@ export default function Home() {
       zoom: getSearchZoom(partialMatch.geo)
     });
 
-    setSearchMessage(`${countryName}만 지도에 표시했습니다.`);
+    setSearchMessage(`${countryName}을 강조 표시했습니다.`);
   };
 
   const resetMap = () => {
@@ -493,6 +501,7 @@ export default function Home() {
                 setSelectedBrand(brand);
                 setSelectedCountry(null);
                 setSearchMessage("");
+                setSearchedCountryIso(null);
               }}
               style={{
                 padding: "10px 18px",
@@ -687,38 +696,54 @@ export default function Home() {
                   {({ geographies }) =>
                     geographies
                       .filter((geo) => geo.id && geo.id !== "ATA")
-                      .filter((geo) =>
-                        searchedCountryIso ? geo.id === searchedCountryIso : true
-                      )
                       .map((geo) => {
                         const iso3 = geo.id;
                         const countryData = getCountryData(iso3);
-                        const countryColor = getColor(countryData);
+
+                        const isSearchMode = Boolean(searchedCountryIso);
+                        const isFocusedCountry =
+                          searchedCountryIso === geo.id || !isSearchMode;
+
+                        const countryColor = isFocusedCountry
+                          ? getColor(countryData)
+                          : "#E5E7EB";
+
+                        const hoverColor = isFocusedCountry
+                          ? getHoverColor(countryData)
+                          : "#CBD5E1";
 
                         return (
                           <Geography
                             key={geo.rsmKey}
                             geography={geo}
                             fill={countryColor}
-                            stroke="#FFFFFF"
-                            strokeWidth={0.5}
+                            stroke={
+                              searchedCountryIso === geo.id
+                                ? "#0F172A"
+                                : "#FFFFFF"
+                            }
+                            strokeWidth={
+                              searchedCountryIso === geo.id ? 1.1 : 0.5
+                            }
                             style={{
                               default: {
                                 outline: "none",
-                                transition: "all 0.2s ease"
+                                transition: "all 0.2s ease",
+                                opacity: isFocusedCountry ? 1 : 0.42
                               },
                               hover: {
-                                fill: getHoverColor(countryData),
+                                fill: hoverColor,
                                 stroke: "#0F172A",
                                 strokeWidth: 0.9,
                                 outline: "none",
-                                cursor: "pointer"
+                                cursor: "pointer",
+                                opacity: 1
                               },
                               pressed: {
                                 outline: "none"
                               }
                             }}
-                            onClick={() => handleCountrySelect(geo)}
+                            onClick={() => handleCountrySelect(geo, true)}
                           />
                         );
                       })
