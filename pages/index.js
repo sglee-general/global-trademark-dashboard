@@ -12,7 +12,7 @@ import {
 countries.registerLocale(koLocale);
 
 const geoUrl =
-  "https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json";
+  "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson";
 
 const CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vTv9Nf_RdMQwHDRRk1L1PrL6LsBV1hfhjUsZ9MhIV1LPWLOAmmb8BwI-eIavV01nrJORaE0U5Tv4g_b/pub?output=csv";
@@ -89,6 +89,23 @@ function getColor(country) {
   }
 }
 
+function getHoverColor(country) {
+  if (!country) return "#CBD5E1";
+
+  switch (country.STATUS) {
+    case "green":
+      return "#16A34A";
+    case "blue":
+      return "#2563EB";
+    case "yellow":
+      return "#EAB308";
+    case "red":
+      return "#DC2626";
+    default:
+      return "#CBD5E1";
+  }
+}
+
 function collectCoordinates(coords, points) {
   if (!coords) return;
 
@@ -126,6 +143,27 @@ function getFeatureCenter(geo) {
   return [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
 }
 
+function getSearchZoom(geo) {
+  const points = [];
+
+  collectCoordinates(geo?.geometry?.coordinates, points);
+
+  if (points.length === 0) return 2.4;
+
+  const lngs = points.map((point) => point[0]);
+  const lats = points.map((point) => point[1]);
+
+  const width = Math.max(...lngs) - Math.min(...lngs);
+  const height = Math.max(...lats) - Math.min(...lats);
+  const size = Math.max(width, height);
+
+  if (size > 80) return 1.4;
+  if (size > 45) return 1.8;
+  if (size > 25) return 2.4;
+  if (size > 12) return 3.2;
+  return 4.2;
+}
+
 export default function Home() {
   const [data, setData] = useState([]);
   const [brands, setBrands] = useState(FIXED_BRANDS);
@@ -134,6 +172,7 @@ export default function Home() {
   const [allCountries, setAllCountries] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [searchMessage, setSearchMessage] = useState("");
+  const [searchedCountryIso, setSearchedCountryIso] = useState(null);
 
   const [position, setPosition] = useState(INITIAL_MAP_POSITION);
 
@@ -350,12 +389,14 @@ export default function Home() {
       countryName
     });
 
+    setSearchedCountryIso(partialMatch.iso3);
+
     setPosition({
       coordinates: getFeatureCenter(partialMatch.geo),
-      zoom: 2.2
+      zoom: getSearchZoom(partialMatch.geo)
     });
 
-    setSearchMessage(`${countryName} 정보를 표시했습니다.`);
+    setSearchMessage(`${countryName}만 지도에 표시했습니다.`);
   };
 
   const resetMap = () => {
@@ -363,6 +404,7 @@ export default function Home() {
     setSelectedCountry(null);
     setSearchText("");
     setSearchMessage("");
+    setSearchedCountryIso(null);
   };
 
   const cardLabelStyle = {
@@ -523,7 +565,7 @@ export default function Home() {
               cursor: "pointer"
             }}
           >
-            초기화
+            전체 지도 보기
           </button>
         </form>
 
@@ -645,15 +687,19 @@ export default function Home() {
                   {({ geographies }) =>
                     geographies
                       .filter((geo) => geo.id && geo.id !== "ATA")
+                      .filter((geo) =>
+                        searchedCountryIso ? geo.id === searchedCountryIso : true
+                      )
                       .map((geo) => {
                         const iso3 = geo.id;
                         const countryData = getCountryData(iso3);
+                        const countryColor = getColor(countryData);
 
                         return (
                           <Geography
                             key={geo.rsmKey}
                             geography={geo}
-                            fill={getColor(countryData)}
+                            fill={countryColor}
                             stroke="#FFFFFF"
                             strokeWidth={0.5}
                             style={{
@@ -662,7 +708,9 @@ export default function Home() {
                                 transition: "all 0.2s ease"
                               },
                               hover: {
-                                fill: "#111827",
+                                fill: getHoverColor(countryData),
+                                stroke: "#0F172A",
+                                strokeWidth: 0.9,
                                 outline: "none",
                                 cursor: "pointer"
                               },
